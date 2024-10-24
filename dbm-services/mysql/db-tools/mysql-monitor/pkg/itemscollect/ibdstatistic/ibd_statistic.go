@@ -35,6 +35,7 @@ var systemDBs = []string{
 	"infodba_schema",
 	"performance_schema",
 	"test",
+	"db_infobase",
 }
 
 func init() {
@@ -70,7 +71,12 @@ func (c *ibdStatistic) Run() (msg string, err error) {
 		return "", err
 	}
 
-	err = reportMetrics(result)
+	//err = reportMetrics(result)
+	//if err != nil {
+	//	return "", err
+	//}
+
+	err = reportLog(result)
 	if err != nil {
 		return "", err
 	}

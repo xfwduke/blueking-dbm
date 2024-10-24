@@ -51,7 +51,7 @@
   role: []
 - name: ibd-statistic
   enable: true
-  schedule: 0 0 14 * * 1
+  schedule: 0 45 23 * * *
   machine_type:
   - single
   - backend
@@ -65,9 +65,12 @@
   machine_type:
   - backend
   - remote
+  - spider
   role:
   - master
   - repeater
+  - slave
+  - spider_master
 - name: mysql-config-diff
   enable: true
   schedule: 0 5 10 * * *
@@ -78,15 +81,21 @@
   - spider
   role: []
 - name: mysql-connlog-size
-  enable: true
+  enable: false
   schedule: 0 0 12 * * *
   machine_type:
+  - single
+  - backend
+  - remote
   - spider
   role: []
 - name: mysql-connlog-rotate
-  enable: true
+  enable: false
   schedule: 0 30 23 * * *
   machine_type:
+  - single
+  - backend
+  - remote
   - spider
   role: []
 - name: mysql-err-notice
@@ -211,7 +220,7 @@
   - backend
   role: []
 - name: unique-ctl-master
-  enable: true
+  enable: false
   schedule: '@every 1m'
   machine_type:
   - spider
@@ -251,3 +260,10 @@
   machine_type:
   - proxy
   role: []
+- name: get-ctl-primary
+  enable: false
+  schedule: '@every 1m'
+  machine_type:
+  - spider
+  role:
+  - spider_master

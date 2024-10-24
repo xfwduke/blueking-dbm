@@ -30,10 +30,10 @@ import (
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/itemscollect/rotateslowlog"
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/itemscollect/scenesnapshot"
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/itemscollect/slavestatus"
+	"dbm-services/mysql/db-tools/mysql-monitor/pkg/itemscollect/spiderctlchecker"
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/itemscollect/spiderremote"
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/itemscollect/timezonechange"
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/itemscollect/tscc"
-	"dbm-services/mysql/db-tools/mysql-monitor/pkg/itemscollect/uniquectlmaster"
 	mi "dbm-services/mysql/db-tools/mysql-monitor/pkg/monitoriteminterface"
 )
 
@@ -89,9 +89,10 @@ func init() {
 	_ = registerItemConstructor(spiderremote.Register())
 	_ = registerItemConstructor(tscc.Register())
 	_ = registerItemConstructor(dbhaheartbeat.Register())
-	_ = registerItemConstructor(uniquectlmaster.Register())
+	_ = registerItemConstructor(spiderctlchecker.UniqueCtlCheckerRegister())
 	_ = registerItemConstructor(scenesnapshot.Register())
 	_ = registerItemConstructor(timezonechange.RegisterSysTimezoneChange())
 	_ = registerItemConstructor(timezonechange.RegisterMySQLTimezoneChange())
 	_ = registerItemConstructor(rotateproxyconnlog.RegisterRotateProxyConnlog())
+	_ = registerItemConstructor(spiderctlchecker.GetCtlPrimaryRegister())
 }

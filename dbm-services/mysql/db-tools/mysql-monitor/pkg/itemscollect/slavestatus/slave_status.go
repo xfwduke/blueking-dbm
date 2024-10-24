@@ -48,11 +48,11 @@ func (s *slaveStatusChecker) Run() (msg string, err error) {
 		if err != nil {
 			slog.Warn("invalid errno", err)
 		} else {
-			slog.Debug("err no found", slog.Int("io err", ioErrNo), slog.Int("sql err", sqlErrNo))
-			slog.Debug("io err if is skip", slog.Int("id", slices.Index(skipErrNos, ioErrNo)))
-			slog.Debug("sql err if is skip", slog.Int("id", slices.Index(skipErrNos, sqlErrNo)))
+			slog.Info("err no found", slog.Int("io err", ioErrNo), slog.Int("sql err", sqlErrNo))
+			slog.Info("io err if is skip", slog.Int("id", slices.Index(skipErrNos, ioErrNo)))
+			slog.Info("sql err if is skip", slog.Int("id", slices.Index(skipErrNos, sqlErrNo)))
 			if slices.Index(skipErrNos, ioErrNo) >= 0 || slices.Index(skipErrNos, sqlErrNo) >= 0 {
-				slog.Debug("need skip errno found")
+				slog.Info("need skip errno found")
 				err := s.skipErr()
 				if err != nil {
 					slog.Warn(
@@ -108,6 +108,10 @@ func (s *slaveStatusChecker) skipErr() error {
 func (s *slaveStatusChecker) isOk() bool {
 	return strings.ToUpper(s.slaveStatus["Slave_IO_Running"].(string)) == "YES" &&
 		strings.ToUpper(s.slaveStatus["Slave_SQL_Running"].(string)) == "YES"
+}
+
+func (s *slaveStatusChecker) masterHost() string {
+	return s.slaveStatus["Master_Host"].(string)
 }
 
 func (s *slaveStatusChecker) getErrNo() (ioErrNo int, sqlErrNo int, err error) {
