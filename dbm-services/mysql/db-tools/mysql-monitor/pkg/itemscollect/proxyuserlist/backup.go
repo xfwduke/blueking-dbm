@@ -96,7 +96,6 @@ func (c *Checker) cleanOldBackup() error {
 		ctx,
 		`DELETE FROM infodba_schema.proxy_user_list 
        				WHERE create_at < DATE(NOW() - INTERVAL 7 DAY)`,
-		config.MonitorConfig.Ip,
 	)
 	if err != nil {
 		slog.Error("backup proxy user list delete", slog.String("err", err.Error()))

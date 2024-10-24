@@ -22,13 +22,13 @@ import (
 var tableSizeMetricName string
 var dbSizeMetricName string
 
-var tendbClusterDbNamePattern *regexp.Regexp
+var tenDBClusterDbNamePattern *regexp.Regexp
 
 func init() {
 	tableSizeMetricName = "mysql_table_size"
 	dbSizeMetricName = "mysql_database_size"
 
-	tendbClusterDbNamePattern = regexp.MustCompile(`^(.*)_[0-9]+$`)
+	tenDBClusterDbNamePattern = regexp.MustCompile(`^(.*)_[0-9]+$`)
 }
 
 func reportMetrics(result map[string]map[string]int64) error {
@@ -38,7 +38,7 @@ func reportMetrics(result map[string]map[string]int64) error {
 
 		// 根据 dbm 枚举约定, remote 是 tendbcluster 的存储机器类型
 		if config.MonitorConfig.MachineType == "remote" && slices.Index(systemDBs, dbName) < 0 {
-			match := tendbClusterDbNamePattern.FindStringSubmatch(dbName)
+			match := tenDBClusterDbNamePattern.FindStringSubmatch(dbName)
 			if match == nil {
 				err := errors.Errorf(
 					"invalid dbname: '%s' on %s",

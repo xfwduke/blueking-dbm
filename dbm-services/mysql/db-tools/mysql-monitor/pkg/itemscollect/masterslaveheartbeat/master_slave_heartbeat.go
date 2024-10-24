@@ -4,8 +4,12 @@ package masterslaveheartbeat
 import (
 	"context"
 	"database/sql"
+	"dbm-services/mysql/db-tools/mysql-monitor/pkg/utils"
+
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/config"
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/internal/cst"
@@ -38,6 +42,13 @@ type Checker struct {
 	heartBeatTable string
 }
 
+type primaryDesc struct {
+	ServerName   string `db:"SERVER_NAME"`
+	Host         string `db:"HOST"`
+	Port         uint32 `db:"PORT"`
+	IsThisServer uint32 `db:"IS_THIS_SERVER"`
+}
+
 func (c *Checker) updateHeartbeat() error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.MonitorConfig.InteractTimeout)
 	defer cancel()
@@ -48,13 +59,13 @@ func (c *Checker) updateHeartbeat() error {
 		Scan(&masterServerId, &binlogFormatOld)
 	if err != nil {
 		slog.Error(
-			"master-slave-heartbeat query server_id, binlog_format",
+			name,
 			slog.String("error", err.Error()),
 		)
 		return err
 	}
-	slog.Debug(
-		"master-slave-heartbeat",
+	slog.Info(
+		name,
 		slog.String("server_id", masterServerId),
 		slog.String("binlog_format", binlogFormatOld),
 	)
@@ -62,7 +73,7 @@ func (c *Checker) updateHeartbeat() error {
 	// will set session variables, so get a connection from pool
 	conn, err := c.db.DB.Conn(context.Background())
 	if err != nil {
-		slog.Error("master-slave-heartbeat get conn from db", slog.String("error", err.Error()))
+		slog.Error(name, slog.String("error", err.Error()))
 		return err
 	}
 	defer func() {
@@ -85,7 +96,7 @@ VALUES('%s', @@server_id, now(), sysdate(), timestampdiff(SECOND, now(),sysdate(
 		c.heartBeatTable, masterServerId)
 
 	if _, err = conn.ExecContext(ctx, txrrSQL); err != nil {
-		err := errors.WithMessage(err, "update heartbeat need SET SESSION tx_isolation = 'REPEATABLE-READ'")
+		err := errors.Wrapf(err, "update heartbeat need SET SESSION tx_isolation = 'REPEATABLE-READ'")
 		slog.Error("master-slave-heartbeat", slog.String("error", err.Error()))
 		return err
 	}
@@ -102,10 +113,74 @@ VALUES('%s', @@server_id, now(), sysdate(), timestampdiff(SECOND, now(),sysdate(
 		return err
 	} else {
 		if num, _ := res.RowsAffected(); num > 0 {
-			slog.Debug("master-slave-heartbeat insert success")
+			slog.Info("master-slave-heartbeat insert success")
 		}
 	}
-	slog.Debug("master-slave-heartbeat update slave success")
+	slog.Info("master-slave-heartbeat update slave success")
+	return nil
+}
+
+func (c *Checker) reportHeartbeatDelay() error {
+	slaveStatus := make(map[string]interface{})
+	rows, err := c.db.Queryx(`SHOW SLAVE STATUS`)
+	if err != nil {
+		slog.Error(name, slog.String("error", err.Error()))
+		return err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	for rows.Next() {
+		err := rows.MapScan(slaveStatus)
+		if err != nil {
+			slog.Error(name, slog.String("error", err.Error()))
+			return err
+		}
+		break
+	}
+
+	for k, v := range slaveStatus {
+		if value, ok := v.([]byte); ok {
+			slaveStatus[k] = strings.TrimSpace(string(value))
+		}
+	}
+
+	masterServerId, err := strconv.ParseInt(slaveStatus["Master_Server_Id"].(string), 10, 64)
+	if err != nil {
+		slog.Error(name, slog.String("error", err.Error()))
+		return err
+	}
+
+	slog.Info(name, slog.Any("master server id", masterServerId))
+
+	var timeDelay int64
+	err = c.db.QueryRowx(
+		`select convert((unix_timestamp(now())-unix_timestamp(master_time)),UNSIGNED) as time_delay 
+					from infodba_schema.master_slave_heartbeat 
+					where master_server_id = ? and slave_server_id != master_server_id`,
+		masterServerId,
+	).Scan(&timeDelay)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			timeDelay = 99999999
+		} else {
+			return err
+		}
+	}
+
+	slog.Info("master_slave_heartbeat delay", slog.Int64("delay", timeDelay))
+
+	utils.SendMonitorMetrics(
+		strings.Replace(name, "-", "_", -1),
+		timeDelay,
+		map[string]interface{}{
+			"master-server_id": masterServerId,
+			"master-host":      slaveStatus["Master_Host"],
+			"master-port":      slaveStatus["Master_Port"],
+		},
+	)
+
 	return nil
 }
 
@@ -117,8 +192,63 @@ func (c *Checker) initTableHeartbeat() (sql.Result, error) {
 // Run TODO
 func (c *Checker) Run() (msg string, err error) {
 	// check if dbbackup loadbackup running, skip this round
-	err = c.updateHeartbeat()
+	slog.Info(name, slog.String("role", *config.MonitorConfig.Role))
+	slog.Info(name, slog.String("machine type", config.MonitorConfig.MachineType))
+	if config.MonitorConfig.MachineType == "spider" {
+		return c.heartBeatOnSpider()
+	} else {
+		return c.heartBeatOnStorage()
+
+	}
+}
+
+func (c *Checker) heartBeatOnSpider() (msg string, err error) {
+	if *config.MonitorConfig.Role != "spider_master" {
+		return "", nil
+	}
+
+	res := primaryDesc{}
+	err = c.db.QueryRowx(`tdbctl get primary`).StructScan(&res)
+	if err != nil {
+		slog.Error(name, slog.String("err", err.Error()))
+		return "", err
+	}
+	slog.Info(name, slog.Bool("is primary", res.IsThisServer == 1))
+	if res.IsThisServer == 1 {
+		err = c.updateHeartbeat()
+	} else {
+		err = c.reportHeartbeatDelay()
+	}
+
 	return "", err
+}
+
+func (c *Checker) heartBeatOnStorage() (msg string, err error) {
+	slog.Info(name, slog.String("machine type", config.MonitorConfig.MachineType))
+	switch *config.MonitorConfig.Role {
+	case "master":
+		err = c.updateHeartbeat()
+		if err != nil {
+			return "", err
+		}
+	case "slave":
+		err = c.reportHeartbeatDelay()
+		if err != nil {
+			return "", err
+		}
+	case "repeater":
+		err = c.updateHeartbeat()
+		if err != nil {
+			return "", err
+		}
+		err = c.reportHeartbeatDelay()
+		if err != nil {
+			return "", err
+		}
+	default:
+		return "", errors.Errorf("unkown role: %s", *config.MonitorConfig.Role)
+	}
+	return "", nil
 }
 
 // Name TODO

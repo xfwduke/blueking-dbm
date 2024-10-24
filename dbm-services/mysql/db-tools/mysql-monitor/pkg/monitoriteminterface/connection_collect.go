@@ -149,7 +149,7 @@ func NewConnectionCollect() (*ConnectionCollect, error) {
 					slog.String("ip", config.MonitorConfig.Ip),
 					slog.Int("port", ctlPort),
 				)
-				return nil, err
+				return nil, errors.Wrap(err, "connect spider ctl")
 			}
 		}
 
