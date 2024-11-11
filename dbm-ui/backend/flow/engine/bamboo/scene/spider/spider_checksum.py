@@ -124,7 +124,7 @@ class SpiderChecksumFlow(object):
         )
         sub_pipelines = []
 
-        ran_str = get_random_string(length=8)
+        ran_str = get_random_string(length=8).lower()
         random_account = "{}{}".format(ACCOUNT_PREFIX, ran_str)
         ran_str_obj = {"ran_str": ran_str}
 
