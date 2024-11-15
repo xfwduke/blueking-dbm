@@ -22,8 +22,20 @@ func (ins *MySQLProxySwitch) CheckSwitch() (bool, error) {
 // DoSwitch mysql-proxy do switch
 // delete ip under the entry
 func (ins *MySQLProxySwitch) DoSwitch() error {
-	ins.ReportLogs(constvar.InfoResult, fmt.Sprintf("try to release ip[%s] from all cluster entery", ins.Ip))
-	return ins.DeleteNameService(ins.Entry)
+	//1. delete name service
+	isSingle, err := ins.SingleAddressUnderDomain(ins.Entry)
+	if err != nil {
+		ins.ReportLogs(constvar.FailResult, fmt.Sprintf("check whether single address under domain failed:%s",
+			err.Error()))
+		return err
+	}
+	if isSingle {
+		return fmt.Errorf("only single address under this domain, skip release domain")
+	} else {
+		ins.ReportLogs(constvar.InfoResult, fmt.Sprintf("try to release ip[%s#%d] from all cluster entry",
+			ins.Ip, ins.Port))
+		return ins.DeleteNameService(ins.Entry)
+	}
 }
 
 // ShowSwitchInstanceInfo display switch proxy info

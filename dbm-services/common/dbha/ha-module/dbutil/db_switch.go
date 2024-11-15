@@ -184,6 +184,30 @@ func (ins *BaseSwitch) GetInfo(infoKey string) (bool, interface{}) {
 	}
 }
 
+// SingleAddressUnderDomain check whether only one address under domain
+// if only one address under dns entry, return true
+// if no dns entry found, return false
+func (ins *BaseSwitch) SingleAddressUnderDomain(entry BindEntry) (bool, error) {
+	if entry.Dns == nil {
+		return false, nil
+	}
+	conf := ins.Config
+	dnsClient := client.NewNameServiceClient(&conf.NameServices.DnsConf, conf.GetCloudId())
+	for _, dns := range entry.Dns {
+		number, err := dnsClient.GetAddressNumberByDomain(dns.DomainName)
+		if err != nil {
+			return false, err
+		}
+		ins.ReportLogs(constvar.InfoResult, fmt.Sprintf("found %d address under domain %s",
+			number, dns.DomainName))
+		if number == 1 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // DeleteNameService delete broken-down ip from entry
 func (ins *BaseSwitch) DeleteNameService(entry BindEntry) error {
 	//flag refer to whether release name-service success

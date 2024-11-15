@@ -68,6 +68,32 @@ func (c *NameServiceClient) GetDomainInfoByIp(ip string) ([]DomainInfo, error) {
 	return res.Detail, nil
 }
 
+// GetAddressNumberByDomain get address number under this domain name
+func (c *NameServiceClient) GetAddressNumberByDomain(domainName string) (int, error) {
+	var res DomainRes
+	req := map[string]interface{}{
+		"db_cloud_token": c.Conf.BKConf.BkToken,
+		"bk_cloud_id":    c.CloudId,
+		"domain_name":    []string{domainName},
+	}
+
+	response, err := c.DoNew(http.MethodPost,
+		c.SpliceUrlByPrefix(c.Conf.UrlPre, constvar.GetDomainInfoUrl, ""), req, nil)
+	if err != nil {
+		return 0, err
+	}
+	if response.Code != 0 {
+		return 0, fmt.Errorf("%s failed, return code:%d, msg:%s", util.AtWhere(), response.Code, response.Msg)
+	}
+
+	err = json.Unmarshal(response.Data, &res)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.RowsNum, nil
+}
+
 // GetDomainInfoByDomain get address info from dns by domain
 func (c *NameServiceClient) GetDomainInfoByDomain(domainName string) ([]DomainInfo, error) {
 	var res DomainRes
