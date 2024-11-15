@@ -440,3 +440,10 @@ class ListCvmDeviceClassSerializer(serializers.Serializer):
 class ListCvmDeviceClassResponseSerializer(serializers.Serializer):
     class Meta:
         swagger_schema_fields = {"example": mock.DEVICE_CLASS_DATA}
+
+
+class UworkIpsSerializer(serializers.Serializer):
+    ips = serializers.CharField(help_text=_("ip列表，多个ip以逗号分割"))
+
+    def validate_ip_list(self, value):
+        return value.split(",")

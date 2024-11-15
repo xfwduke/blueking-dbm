@@ -24,6 +24,7 @@ from backend.bk_web.swagger import common_swagger_auto_schema
 from backend.components import CCApi
 from backend.components.dbresource.client import DBResourceApi
 from backend.components.hcm.client import HCMApi
+from backend.components.uwork.client import UWORKApi
 from backend.configuration.constants import SystemSettingsEnum
 from backend.configuration.models import SystemSettings
 from backend.db_meta.models import AppCache
@@ -55,6 +56,7 @@ from backend.db_services.dbresource.serializers import (
     ResourceUpdateSerializer,
     SpecCountResourceResponseSerializer,
     SpecCountResourceSerializer,
+    UworkIpsSerializer,
 )
 from backend.db_services.ipchooser.constants import BK_OS_CODE__TYPE, BkOsType, ModeType
 from backend.db_services.ipchooser.handlers.host_handler import HostHandler
@@ -494,3 +496,17 @@ class DBResourceViewSet(viewsets.SystemViewSet):
     def spec_resource_count(self, request):
         apply_params = self.params_validate(self.get_serializer_class())
         return Response(ResourceHandler.spec_resource_count(**apply_params))
+
+    @common_swagger_auto_schema(
+        operation_summary=_("查询故障主机信息"),
+        query_serializer=UworkIpsSerializer(),
+        tags=[SWAGGER_TAG],
+    )
+    @action(detail=False, methods=["GET"], serializer_class=UworkIpsSerializer)
+    def check_uwork_ips(self, request):
+        if not env.UWORK_APIGW_DOMAIN:
+            return Response({"results": []})
+        ip_list = self.params_validate(self.get_serializer_class())["ips"]
+        results = UWORKApi.uwork_list(params={"serverIpList": ip_list})
+        uwork_list = [result["serverIp"] for result in results]
+        return Response({"results": uwork_list})
