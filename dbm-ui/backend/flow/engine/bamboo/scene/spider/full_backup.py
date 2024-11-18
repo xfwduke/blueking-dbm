@@ -15,18 +15,16 @@ from collections import defaultdict
 from dataclasses import asdict
 from typing import Dict, List, Optional
 
-from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import ugettext as _
 
 from backend.configuration.constants import DBType
 from backend.constants import IP_PORT_DIVIDER
-from backend.db_meta.enums import ClusterType, InstanceInnerRole, TenDBClusterSpiderRole
-from backend.db_meta.exceptions import ClusterNotExistException
+from backend.db_meta.enums import InstanceInnerRole, TenDBClusterSpiderRole
 from backend.db_meta.models import Cluster, StorageInstanceTuple
 from backend.flow.consts import DBA_SYSTEM_USER, LONG_JOB_TIMEOUT
 from backend.flow.engine.bamboo.scene.common.builder import Builder, SubBuilder, SubProcess
 from backend.flow.engine.bamboo.scene.common.get_file_list import GetFileList
-from backend.flow.engine.exceptions import IncompatibleBackupTypeAndLocal, MySQLBackupLocalException
+from backend.flow.engine.exceptions import MySQLBackupLocalException
 from backend.flow.plugins.components.collections.mysql.exec_actuator_script import ExecuteDBActuatorScriptComponent
 from backend.flow.plugins.components.collections.mysql.mysql_link_backup_id_bill_id import (
     MySQLLinkBackupIdBillIdComponent,
@@ -51,49 +49,51 @@ class TenDBClusterFullBackupFlow(object):
         "created_type": "xxx",
         "bk_biz_id": "152",
         "ticket_type": "TENDBCLUSTER_FULL_BACKUP",
-        "infos": {
-            "backup_type": enum of backend.flow.consts.MySQLBackupTypeEnum,
-            "file_tag": enum of backend.flow.consts.MySQLBackupFileTagEnum,
-            “clusters": [
+        "backup_type": enum of backend.flow.consts.MySQLBackupTypeEnum,
+        "file_tag": enum of backend.flow.consts.MySQLBackupFileTagEnum,
+        "infos": [
               {
                 "cluster_id": int,
                 "backup_local": enum [backend.db_meta.enum.InstanceInnerRole, SPIDER_MNT],
                 "spider_mnt_address": "x.x.x.x:y" # 如果 backup_local 是 spider_mnt
               },
               ...
-            ],
-        }
+        ]
         }
         增加单据临时ADMIN账号的添加和删除逻辑
         """
 
-        clusters = self.data["infos"]["clusters"]
-        cluster_ids = [i["cluster_id"] for i in self.data["infos"]["clusters"]]
+        cluster_ids = [job["cluster_id"] for job in self.data["infos"]]
 
         backup_pipeline = Builder(
             root_id=self.root_id, data=self.data, need_random_pass_cluster_ids=list(set(cluster_ids))
         )
 
         cluster_pipes = []
-        for cluster in clusters:
-            if (
-                self.data["infos"]["backup_type"] == "physical"
-                and cluster["backup_local"] == TenDBClusterSpiderRole.SPIDER_MNT.value
-            ):
-                IncompatibleBackupTypeAndLocal(
-                    backup_type=self.data["infos"]["backup_type"], backup_local=cluster["backup_local"]
-                )
+        # for cluster in clusters:
+        #     if (
+        #         self.data["infos"]["backup_type"] == "physical"
+        #         and cluster["backup_local"] == TenDBClusterSpiderRole.SPIDER_MNT.value
+        #     ):
+        #         IncompatibleBackupTypeAndLocal(
+        #             backup_type=self.data["infos"]["backup_type"], backup_local=cluster["backup_local"]
+        #         )
+        for job in self.data["infos"]:
+            cluster_id = job["cluster_id"]
+            backup_local = job["backup_local"]
 
-            try:
-                cluster_obj = Cluster.objects.get(
-                    pk=cluster["cluster_id"],
-                    bk_biz_id=self.data["bk_biz_id"],
-                    cluster_type=ClusterType.TenDBCluster.value,
-                )
-            except ObjectDoesNotExist:
-                raise ClusterNotExistException(
-                    cluster_type=ClusterType.TenDBCluster.value, cluster_id=cluster["cluster_id"], immute_domain=""
-                )
+            cluster_obj = Cluster.objects.get(pk=cluster_id, bk_biz_id=self.data["bk_biz_id"])
+
+            # try:
+            #     cluster_obj = Cluster.objects.get(
+            #         pk=cluster["cluster_id"],
+            #         bk_biz_id=self.data["bk_biz_id"],
+            #         cluster_type=ClusterType.TenDBCluster.value,
+            #     )
+            # except ObjectDoesNotExist:
+            #     raise ClusterNotExistException(
+            #         cluster_type=ClusterType.TenDBCluster.value, cluster_id=cluster["cluster_id"], immute_domain=""
+            #     )
 
             backup_id = uuid.uuid1()
             cluster_pipe = SubBuilder(
@@ -113,22 +113,22 @@ class TenDBClusterFullBackupFlow(object):
                 sub_flow=self.backup_on_spider_ctl(backup_id=backup_id, cluster_obj=cluster_obj)
             )
 
-            if cluster["backup_local"] == InstanceInnerRole.SLAVE.value:  # "remote":
+            if backup_local == InstanceInnerRole.SLAVE.value:  # "remote":
                 cluster_pipe.add_parallel_sub_pipeline(
                     sub_flow_list=self.backup_on_remote_slave(backup_id=backup_id, cluster_obj=cluster_obj)
                 )
-            elif cluster["backup_local"] == InstanceInnerRole.MASTER.value:
+            elif backup_local == InstanceInnerRole.MASTER.value:
                 cluster_pipe.add_parallel_sub_pipeline(
                     sub_flow_list=self.backup_on_remote_master(backup_id=backup_id, cluster_obj=cluster_obj)
                 )
-            elif cluster["backup_local"] == TenDBClusterSpiderRole.SPIDER_MNT.value:
+            elif backup_local == TenDBClusterSpiderRole.SPIDER_MNT.value:
                 cluster_pipe.add_sub_pipeline(
                     sub_flow=self.backup_on_spider_mnt(
-                        backup_id=backup_id, cluster_obj=cluster_obj, spider_mnt_address=cluster["spider_mnt_address"]
+                        backup_id=backup_id, cluster_obj=cluster_obj, spider_mnt_address=job["spider_mnt_address"]
                     )
                 )
             else:
-                raise MySQLBackupLocalException(msg=_("不支持的备份位置 {}".format(cluster["backup_local"])))
+                raise MySQLBackupLocalException(msg=_("不支持的备份位置 {}".format(backup_local)))
 
             cluster_pipe.add_act(
                 act_name=_("关联备份id"),

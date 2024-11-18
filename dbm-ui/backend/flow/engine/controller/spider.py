@@ -10,6 +10,8 @@ specific language governing permissions and limitations under the License.
 
 from backend.db_meta.enums import ClusterType
 from backend.flow.engine.bamboo.scene.spider.append_deploy_ctl_flow import AppendDeployCTLFlow
+from backend.flow.engine.bamboo.scene.spider.db_table_backup import TenDBClusterDBTableBackupFlow
+from backend.flow.engine.bamboo.scene.spider.full_backup import TenDBClusterFullBackupFlow
 from backend.flow.engine.bamboo.scene.spider.import_sqlfile_flow import ImportSQLFlow
 from backend.flow.engine.bamboo.scene.spider.remote_local_slave_recover import TenDBRemoteSlaveLocalRecoverFlow
 from backend.flow.engine.bamboo.scene.spider.remote_master_fail_over import RemoteMasterFailOverFlow
@@ -19,13 +21,11 @@ from backend.flow.engine.bamboo.scene.spider.remote_slave_recover import TenDBRe
 from backend.flow.engine.bamboo.scene.spider.spider_add_mnt import TenDBClusterAddSpiderMNTFlow
 from backend.flow.engine.bamboo.scene.spider.spider_add_nodes import TenDBClusterAddNodesFlow
 from backend.flow.engine.bamboo.scene.spider.spider_checksum import SpiderChecksumFlow
-from backend.flow.engine.bamboo.scene.spider.spider_cluster_db_table_backup import TenDBClusterDBTableBackupFlow
 from backend.flow.engine.bamboo.scene.spider.spider_cluster_deploy import TenDBClusterApplyFlow
 from backend.flow.engine.bamboo.scene.spider.spider_cluster_destroy import TenDBClusterDestroyFlow
 from backend.flow.engine.bamboo.scene.spider.spider_cluster_disable_deploy import SpiderClusterDisableFlow
 from backend.flow.engine.bamboo.scene.spider.spider_cluster_enable_deploy import SpiderClusterEnableFlow
 from backend.flow.engine.bamboo.scene.spider.spider_cluster_flashback import TenDBClusterFlashbackFlow
-from backend.flow.engine.bamboo.scene.spider.spider_cluster_full_backup import TenDBClusterFullBackupFlow
 from backend.flow.engine.bamboo.scene.spider.spider_cluster_metadata_import_flow import SpiderClusterMetadataImportFlow
 from backend.flow.engine.bamboo.scene.spider.spider_cluster_rollback_flow import TenDBRollBackDataFlow
 from backend.flow.engine.bamboo.scene.spider.spider_cluster_standardize_flow import SpiderClusterStandardizeFlow

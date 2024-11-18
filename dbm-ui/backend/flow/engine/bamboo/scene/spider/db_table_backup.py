@@ -11,17 +11,15 @@ specific language governing permissions and limitations under the License.
 import copy
 import logging
 import uuid
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import asdict
 from typing import Dict, List, Optional
 
-from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import ugettext as _
 
 from backend.configuration.constants import DBType
 from backend.constants import IP_PORT_DIVIDER
 from backend.db_meta.enums import ClusterType, InstanceInnerRole, TenDBClusterSpiderRole
-from backend.db_meta.exceptions import ClusterNotExistException, DBMetaBaseException
 from backend.db_meta.models import Cluster, StorageInstanceTuple
 from backend.flow.consts import DBA_SYSTEM_USER
 from backend.flow.engine.bamboo.scene.common.builder import Builder, SubBuilder, SubProcess
@@ -68,16 +66,11 @@ class TenDBClusterDBTableBackupFlow(object):
                 "table_patterns": ["tb_role%", "tb_mail%", "*"],
                 "ignore_tables": ["tb_role1", "tb_mail10"],
             },
-            ...
-            ...
             ]
         }
         增加单据临时ADMIN账号的添加和删除逻辑
         """
         cluster_ids = [job["cluster_id"] for job in self.data["infos"]]
-        dup_cluster_ids = [item for item, count in Counter(cluster_ids).items() if count > 1]
-        if dup_cluster_ids:
-            raise DBMetaBaseException(message="duplicate clusters found: {}".format(dup_cluster_ids))
 
         backup_pipeline = Builder(
             root_id=self.root_id, data=self.data, need_random_pass_cluster_ids=list(set(cluster_ids))
@@ -85,14 +78,9 @@ class TenDBClusterDBTableBackupFlow(object):
 
         cluster_pipes = []
         for job in self.data["infos"]:
-            try:
-                cluster_obj = Cluster.objects.get(
-                    pk=job["cluster_id"], bk_biz_id=self.data["bk_biz_id"], cluster_type=ClusterType.TenDBCluster.value
-                )
-            except ObjectDoesNotExist:
-                raise ClusterNotExistException(
-                    cluster_type=ClusterType.TenDBCluster.value, cluster_id=job["cluster_id"], immute_domain=""
-                )
+            cluster_obj = Cluster.objects.get(
+                pk=job["cluster_id"], bk_biz_id=self.data["bk_biz_id"], cluster_type=ClusterType.TenDBCluster.value
+            )
 
             backup_id = uuid.uuid1()
 
