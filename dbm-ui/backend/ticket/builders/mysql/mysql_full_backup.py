@@ -100,8 +100,10 @@ class MySQLFullBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
             cluster_id = info["cluster_id"]
             cluster_obj = Cluster.objects.get(pk=cluster_id)
 
-            if cluster_obj.cluster_type == ClusterType.TenDBSingle and backup_local != InstanceInnerRole.ORPHAN:
-                bad.append(_("{} 备份位置只能是 {}".format(cluster_obj.immute_domain, InstanceInnerRole.ORPHAN)))
+            # 为了体验统一, single 也传入 master
+            # 后端得用 orphan
+            if cluster_obj.cluster_type == ClusterType.TenDBSingle and backup_local != "master":
+                bad.append(_("{} 备份位置只能是 {}".format(cluster_obj.immute_domain, "master")))
             elif cluster_obj.cluster_type == ClusterType.TenDBHA and backup_local not in [
                 InstanceInnerRole.MASTER,
                 InstanceInnerRole.SLAVE,
@@ -125,6 +127,10 @@ class MySQLFullBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
             backup_local = info["backup_local"]
             cluster_id = info["cluster_id"]
             cluster_obj = Cluster.objects.get(pk=cluster_id)
+
+            if cluster_obj.cluster_type == ClusterType.TenDBSingle:
+                backup_local = InstanceInnerRole.ORPHAN
+
             if not StorageInstance.objects.filter(
                 cluster=cluster_obj, instance_inner_role=backup_local, is_stand_by=True, status=InstanceStatus.RUNNING
             ).exists():
