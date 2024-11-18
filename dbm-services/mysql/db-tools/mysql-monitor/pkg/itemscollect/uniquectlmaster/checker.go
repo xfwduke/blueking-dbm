@@ -22,6 +22,10 @@ type Checker struct {
 	db *sqlx.DB
 }
 
+// Run
+/*
+集群的中控 primary 是唯一的, 这个在本地做不到, 只能以指标的方式上报聚合监控
+*/
 func (c *Checker) Run() (msg string, err error) {
 	var res struct {
 		ServerName   string `db:"SERVER_NAME"`

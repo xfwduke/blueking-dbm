@@ -21,6 +21,14 @@ var ctlReplicateName = "ctl-replicate"
 
 type ctlReplicateChecker struct {
 	slaveStatusChecker
+	primary *getPrimaryRes
+}
+
+type getPrimaryRes struct {
+	ServerName   string `db:"SERVER_NAME"`
+	Host         string `db:"HOST"`
+	Port         uint32 `db:"PORT"`
+	IsThisServer uint32 `db:"IS_THIS_SERVER"`
 }
 
 // Run 运行
@@ -51,6 +59,20 @@ func (c *ctlReplicateChecker) Run() (msg string, err error) {
 		return fmt.Sprintf("IO/SQL thread not running: %s", slaveErr), nil
 
 	}
+
+	slog.Info(
+		"tdbctl primary is master",
+		slog.String("primary", c.primary.Host),
+		slog.String("master", c.masterHost()),
+	)
+	if c.masterHost() != c.primary.Host {
+		err = fmt.Errorf(
+			"tdbctl slave's master host [%s] != primary host [%s]",
+			c.masterHost(), c.primary.Host,
+		)
+		slog.Error("tdbctl primary is master", slog.String("err", err.Error()))
+		return "", err
+	}
 	return "", nil
 }
 
@@ -58,20 +80,17 @@ func (c *ctlReplicateChecker) isPrimary() (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.MonitorConfig.InteractTimeout)
 	defer cancel()
 
-	var getPrimaryRes []struct {
-		ServerName string `db:"SERVER_NAME"`
-		Host       string `db:"HOST"`
-		Port       string `db:"PORT"`
-		IsThis     int    `db:"IS_THIS_SERVER"`
-	}
+	res := getPrimaryRes{}
 
-	err := c.db.SelectContext(ctx, &getPrimaryRes, `TDBCTL GET PRIMARY`)
+	err := c.db.QueryRowxContext(ctx, `TDBCTL GET PRIMARY`).StructScan(&res)
 	if err != nil {
 		slog.Error("TDBCTL GET PRIMARY", slog.String("error", err.Error()))
 		return false, err
 	}
 
-	return getPrimaryRes[0].IsThis == 1, nil
+	c.primary = &res
+
+	return res.IsThisServer == 1, nil
 }
 
 // Name 监控项名
@@ -81,10 +100,13 @@ func (c *ctlReplicateChecker) Name() string {
 
 // NewCtlReplicateChecker 新建监控项实例
 func NewCtlReplicateChecker(cc *monitoriteminterface.ConnectionCollect) monitoriteminterface.MonitorItemInterface {
-	return &ctlReplicateChecker{slaveStatusChecker{
-		db:          cc.CtlDB,
-		slaveStatus: make(map[string]interface{}),
-	}}
+	return &ctlReplicateChecker{
+		slaveStatusChecker{
+			db:          cc.CtlDB,
+			slaveStatus: make(map[string]interface{}),
+		},
+		nil,
+	}
 }
 
 // RegisterCtlReplicateChecker 注册监控项

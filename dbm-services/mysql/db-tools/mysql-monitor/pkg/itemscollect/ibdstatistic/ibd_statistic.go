@@ -35,6 +35,7 @@ var systemDBs = []string{
 	"infodba_schema",
 	"performance_schema",
 	"test",
+	"db_infobase",
 }
 
 func init() {

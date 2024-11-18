@@ -110,6 +110,10 @@ func (s *slaveStatusChecker) isOk() bool {
 		strings.ToUpper(s.slaveStatus["Slave_SQL_Running"].(string)) == "YES"
 }
 
+func (s *slaveStatusChecker) masterHost() string {
+	return s.slaveStatus["Master_Host"].(string)
+}
+
 func (s *slaveStatusChecker) getErrNo() (ioErrNo int, sqlErrNo int, err error) {
 	ioErrNo, err = strconv.Atoi(s.slaveStatus["Last_IO_Errno"].(string))
 	if err != nil {
