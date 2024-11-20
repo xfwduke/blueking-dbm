@@ -208,5 +208,9 @@ func connectDB(ip string, port int, ca *config.ConnectAuth, withPing bool, isPro
 		slog.Info("ping proxy success")
 	}
 
+	db.SetConnMaxIdleTime(0)
+	db.SetMaxIdleConns(0)
+	db.SetConnMaxLifetime(0)
+
 	return db, nil
 }

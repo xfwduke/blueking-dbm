@@ -220,7 +220,7 @@
   - backend
   role: []
 - name: unique-ctl-master
-  enable: false
+  enable: true
   schedule: '@every 1m'
   machine_type:
   - spider
@@ -261,7 +261,7 @@
   - proxy
   role: []
 - name: get-ctl-primary
-  enable: false
+  enable: true
   schedule: '@every 1m'
   machine_type:
   - spider
