@@ -13,7 +13,8 @@ function mysql_crond_is_alive() {
                         print_log "mysql-crond process found, pid=${PID}"
                         curl -XGET http://127.0.0.1:9999/entries 1>/dev/null 2>&1
                         if [ $? -eq 0 ];then
-                                print_log "connect mysql-crond success"
+                                echo $PID > /home/mysql/mysql-crond/mysql-crond.pid
+                                print_log "connect mysql-crond $PID success"
                                 return 0
                         else
                                 print_log "connect mysql-crond failed, kill pid=${PID}"

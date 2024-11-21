@@ -10,8 +10,10 @@
 package mainloop
 
 import (
+	"dbm-services/mysql/db-tools/dbactuator/pkg/core/cst"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -21,6 +23,7 @@ import (
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/utils"
 
 	_ "github.com/go-sql-driver/mysql" // mysql TODO
+	"github.com/juju/fslock"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
@@ -35,6 +38,22 @@ func Run(hardcode bool) error {
 	}
 	slog.Info("main loop", slog.String("items", strings.Join(iNames, ",")))
 	slog.Info("main loop", slog.Bool("hardcode", hardcode))
+
+	lockFileName := fmt.Sprintf("%d-%s.lock", config.MonitorConfig.Port, strings.Join(iNames, "."))
+	lockFilePath := filepath.Join(cst.MySQLMonitorInstallPath, lockFileName)
+
+	slog.Info("man loop", slog.String("lockFilePath", lockFilePath))
+	lk := fslock.New(lockFilePath)
+	err := lk.TryLock()
+	if err != nil {
+		slog.Error("main loop",
+			slog.String("error", err.Error()))
+		utils.SendMonitorEvent("db-hang", lockFileName)
+		return errors.Wrapf(err, "main loop lock file %s failed, may be last round not finish", lockFilePath)
+	}
+	defer func() {
+		_ = lk.Unlock()
+	}()
 
 	if hardcode && slices.Index(iNames, config.HeartBeatName) >= 0 {
 		utils.SendMonitorMetrics(config.HeartBeatName, 1, nil)
