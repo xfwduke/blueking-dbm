@@ -64,7 +64,7 @@ class MySQLFullBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
         """
         集群 id 不能重复出现
         """
-        dup_cluster_ids = [cid for cid, cnt in collections.Counter(cluster_ids) if cnt > 1]
+        dup_cluster_ids = [cid for cid, cnt in collections.Counter(cluster_ids).items() if cnt > 1]
         if dup_cluster_ids:
             return _(
                 "重复输入集群: {}".format(
@@ -81,7 +81,7 @@ class MySQLFullBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
         cluster_types = []
         for cluster_obj in Cluster.objects.filter(pk__in=cluster_ids):
             if cluster_obj.cluster_type not in [ClusterType.TenDBHA, ClusterType.TenDBSingle]:
-                bad.append(_("不支持的集群类型 {} {}".format(cluster_obj.immute_domain, cluster_obj.cluster_type)))
+                bad.append(str(_("不支持的集群类型 {} {}".format(cluster_obj.immute_domain, cluster_obj.cluster_type))))
 
             cluster_types.append(cluster_obj.cluster_type)
 
@@ -109,9 +109,11 @@ class MySQLFullBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
                 InstanceInnerRole.SLAVE,
             ]:
                 bad.append(
-                    _(
-                        "{} 备份位置只能是 {}".format(
-                            cluster_obj.immute_domain, [InstanceInnerRole.MASTER, InstanceInnerRole.SLAVE]
+                    str(
+                        _(
+                            "{} 备份位置只能是 {}".format(
+                                cluster_obj.immute_domain, [InstanceInnerRole.MASTER, InstanceInnerRole.SLAVE]
+                            )
                         )
                     )
                 )
@@ -135,10 +137,12 @@ class MySQLFullBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
                 cluster=cluster_obj, instance_inner_role=backup_local, is_stand_by=True, status=InstanceStatus.RUNNING
             ).exists():
                 bad.append(
-                    _(
-                        "{} 没找到正常的 {} 实例".format(
-                            cluster_obj.immute_domain,
-                            backup_local,
+                    str(
+                        _(
+                            "{} 没找到正常的 {} 实例".format(
+                                cluster_obj.immute_domain,
+                                backup_local,
+                            )
                         )
                     )
                 )

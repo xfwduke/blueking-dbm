@@ -72,7 +72,7 @@ class MySQLDBTableBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
         """
         集群 id 不能重复出现
         """
-        dup_cluster_ids = [cid for cid, cnt in collections.Counter(cluster_ids) if cnt > 1]
+        dup_cluster_ids = [cid for cid, cnt in collections.Counter(cluster_ids).items() if cnt > 1]
         if dup_cluster_ids:
             return _(
                 "重复输入集群: {}".format(
@@ -89,7 +89,7 @@ class MySQLDBTableBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
         cluster_types = []
         for cluster_obj in Cluster.objects.filter(pk__in=cluster_ids):
             if cluster_obj.cluster_type not in [ClusterType.TenDBHA, ClusterType.TenDBSingle]:
-                bad.append(_("不支持的集群类型 {} {}".format(cluster_obj.immute_domain, cluster_obj.cluster_type)))
+                bad.append(str(_("不支持的集群类型 {} {}".format(cluster_obj.immute_domain, cluster_obj.cluster_type))))
 
             cluster_types.append(cluster_obj.cluster_type)
 
@@ -107,7 +107,7 @@ class MySQLDBTableBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
         exists_cluster_ids = list(
             Cluster.objects.filter(
                 pk__in=cluster_ids, cluster_type__in=[ClusterType.TenDBHA, ClusterType.TenDBSingle]
-            ).values_list("cluster_id", flat=True)
+            ).values_list("id", flat=True)
         )
         not_exists_cluster_ids = list(set(cluster_ids) - set(exists_cluster_ids))
         if not_exists_cluster_ids:
@@ -128,7 +128,7 @@ class MySQLDBTableBackupDetailSerializer(MySQLBaseOperateDetailSerializer):
                 ).exists()
             ):
                 bad.append(_("{} 缺少状态正常的 standby slave".format(cluster_obj.immute_domain)))
-            elif cluster_obj.storageinstance_set.filter(status=InstanceStatus.RUNNING).exists():
+            elif not cluster_obj.storageinstance_set.filter(status=InstanceStatus.RUNNING).exists():
                 bad.append(_("{} 缺少状态正常的存储实例".format(cluster_obj.immute_domain)))
 
         if bad:

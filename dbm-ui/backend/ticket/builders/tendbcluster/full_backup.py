@@ -33,7 +33,27 @@ class TenDBClusterFullBackUpDetailSerializer(TendbBaseOperateDetailSerializer):
 
     infos = serializers.ListSerializer(child=TenDBClusterFullBackupInfoSerializer())
 
+    @classmethod
+    def get_backup_local_params(cls, info):
+        """
+        对备份位置进行提取，
+        两种情况：remote/spider_mnt::127.0.0.1
+        """
+        divider = "::"
+        if divider not in info["backup_local"]:
+            return info
+
+        backup_local, spider_mnt_address = info["backup_local"].split(divider)
+        info["backup_local"] = backup_local
+        info["spider_mnt_address"] = spider_mnt_address
+
+        return info
+
     def validate(self, attrs):
+
+        for cluster_info in attrs["infos"]:
+            self.get_backup_local_params(cluster_info)
+
         cluster_ids = [info["cluster_id"] for info in attrs["infos"]]
 
         errors = []
@@ -58,6 +78,9 @@ class TenDBClusterFullBackUpDetailSerializer(TendbBaseOperateDetailSerializer):
         if msg:
             errors.append(msg)
 
+        if errors:
+            raise serializers.ValidationError(errors)
+
         return attrs
 
     @staticmethod
@@ -65,7 +88,7 @@ class TenDBClusterFullBackUpDetailSerializer(TendbBaseOperateDetailSerializer):
         """
         集群 id 不能重复出现
         """
-        dup_cluster_ids = [cid for cid, cnt in collections.Counter(cluster_ids) if cnt > 1]
+        dup_cluster_ids = [cid for cid, cnt in collections.Counter(cluster_ids).items() if cnt > 1]
         if dup_cluster_ids:
             return _(
                 "重复输入集群: {}".format(
@@ -93,7 +116,7 @@ class TenDBClusterFullBackUpDetailSerializer(TendbBaseOperateDetailSerializer):
         """
         exists_cluster_ids = list(
             Cluster.objects.filter(pk__in=cluster_ids, cluster_type=ClusterType.TenDBCluster).values_list(
-                "cluster_id", flat=True
+                "id", flat=True
             )
         )
         not_exists_cluster_ids = list(set(cluster_ids) - set(exists_cluster_ids))
@@ -107,10 +130,10 @@ class TenDBClusterFullBackUpDetailSerializer(TendbBaseOperateDetailSerializer):
         for info in attrs["infos"]:
             backup_local = info["backup_local"]
             if backup_local not in ["master", "slave", "spider_mnt"]:
-                bad.append(_("不支持的备份位置 {}".format(backup_local)))
+                bad.append(str(_("不支持的备份位置 {}".format(backup_local))))
 
             if backup_local == "spider_mnt" and "spider_mnt_address" not in info:
-                bad.append(_("缺少 spider_mnt_address"))
+                bad.append(str(_("缺少 spider_mnt_address")))
 
         if bad:
             return ", ".join(list(set(bad)))
