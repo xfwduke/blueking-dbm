@@ -52,6 +52,8 @@ func (d *BackupDemandAct) Init() (err error) {
 		logger.Error("DeserializeAndValidate err %s", err.Error())
 		return err
 	}
+
+	d.Payload.GeneralParam = subcmd.GeneralRuntimeParam
 	logger.Warn("params %+v", d.Payload.Params)
 
 	return
@@ -73,6 +75,10 @@ func (d *BackupDemandAct) Run() (err error) {
 		{
 			FunName: "生成备份配置",
 			Func:    d.Payload.GenerateBackupConfig,
+		},
+		{
+			FunName: "终止残留备份进程",
+			Func:    d.Payload.KillLegacyBackup,
 		},
 		{
 			FunName: "执行备份",

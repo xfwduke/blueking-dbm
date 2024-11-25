@@ -85,7 +85,7 @@ class MysqlSqlImportItsmParamBuilder(builders.ItsmParamBuilder):
 
 
 class MysqlSqlImportBackUpFlowParamBuilder(builders.FlowParamBuilder):
-    controller = MySQLController.mysql_ha_db_table_backup_scene
+    controller = MySQLController.mysql_db_table_backup_scene
 
     def format_ticket_data(self):
         backup_infos_list = []

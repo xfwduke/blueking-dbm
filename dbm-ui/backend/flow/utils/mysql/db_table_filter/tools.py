@@ -54,6 +54,8 @@ def replace_glob(p: str) -> str:
 def _build_regexp(parts: List[str], template: str) -> str:
     if parts:
         return template.format("|".join(parts))
+    else:
+        return ""
 
 
 def build_include_regexp(parts: List[str]) -> str:

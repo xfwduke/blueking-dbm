@@ -25,81 +25,81 @@ class DbTableFilter(object):
         exclude_db_patterns: List[str],
         exclude_table_patterns: List[str],
     ):
-        self.include_db_patterns = include_db_patterns
-        self.include_table_patterns = include_table_patterns
-        self.exclude_db_patterns = exclude_db_patterns
-        self.exclude_table_patterns = exclude_table_patterns
+        self.__include_db_patterns = include_db_patterns
+        self.__include_table_patterns = include_table_patterns
+        self.__exclude_db_patterns = exclude_db_patterns
+        self.__exclude_table_patterns = exclude_table_patterns
 
-        self.system_table_parts = []
-        self.system_db_parts = []
+        self.__system_table_parts = []
+        self.__system_db_parts = []
 
-        self._validate()
-        self._build_db_filter_regexp()
-        self._build_table_filter_regexp()
+        self.__validate()
+        self.__build_db_filter_regexp()
+        self.__build_table_filter_regexp()
 
-    def _validate(self):
-        if not self.include_db_patterns or not self.include_table_patterns:
-            raise DbTableFilterValidateException(msg=_("include patterns 不能为空"))
+    def __validate(self):
+        if not self.__include_db_patterns or not self.__include_table_patterns:
+            raise DbTableFilterValidateException(msg=_("include db/table patterns 不能为空"))
 
         # if not (
         #     (self.exclude_db_patterns and self.exclude_table_patterns)
         #     or (not self.exclude_db_patterns and not self.exclude_table_patterns)
         # ):
         #     raise DbTableFilterValidateException(msg=_("exclude patterns 要么同时为空, 要么都不为空"))
-        if "*" in self.exclude_db_patterns or "*" in self.exclude_table_patterns:
+        if "*" in self.__exclude_db_patterns or "*" in self.__exclude_table_patterns:
             raise DbTableFilterValidateException(msg=_("exclude patterns 不能包含 *"))
 
         for patterns in [
-            self.include_db_patterns,
-            self.include_table_patterns,
-            self.exclude_db_patterns,
-            self.exclude_table_patterns,
+            self.__include_db_patterns,
+            self.__include_table_patterns,
+            self.__exclude_db_patterns,
+            self.__exclude_table_patterns,
         ]:
             glob_check(patterns)
 
-    def _build_db_filter_regexp(self):
-        include_parts = ["{}$".format(replace_glob(db)) for db in self.include_db_patterns]
-        exclude_parts = ["{}$".format(replace_glob(db)) for db in self.exclude_db_patterns] + self.system_db_parts
+    def __build_db_filter_regexp(self):
+        include_parts = ["{}$".format(replace_glob(db)) for db in self.__include_db_patterns]
+        exclude_parts = ["{}$".format(replace_glob(db)) for db in self.__exclude_db_patterns] + self.__system_db_parts
 
-        self.db_filter_include_regex = build_include_regexp(include_parts)
-        self.db_filter_exclude_regex = build_exclude_regexp(exclude_parts)
+        self.__db_filter_include_regex = build_include_regexp(include_parts)
+        self.__db_filter_exclude_regex = build_exclude_regexp(exclude_parts)
 
-    def _build_table_filter_regexp(self):
+    def __build_table_filter_regexp(self):
         include_parts = [
             r"{}\.{}$".format(replace_glob(ele[0]), replace_glob(ele[1]))
-            for ele in itertools.product(self.include_db_patterns, self.include_table_patterns)
+            for ele in itertools.product(self.__include_db_patterns, self.__include_table_patterns)
         ]
 
         # 库排除
-        exclude_parts = [r"{}\.{}$".format(replace_glob(edb), replace_glob("*")) for edb in self.exclude_db_patterns]
+        exclude_parts = [r"{}\.{}$".format(replace_glob(edb), replace_glob("*")) for edb in self.__exclude_db_patterns]
         # 表排除
         exclude_parts += [
-            r"{}\.{}$".format(replace_glob("*"), replace_glob(etb)) for etb in self.exclude_table_patterns
+            r"{}\.{}$".format(replace_glob("*"), replace_glob(etb)) for etb in self.__exclude_table_patterns
         ]
 
-        exclude_parts += self.system_db_parts
+        exclude_parts += self.__system_db_parts
 
-        self.table_filter_include_regex = build_include_regexp(include_parts)
-        self.table_filter_exclude_regex = build_exclude_regexp(exclude_parts)
+        self.__table_filter_include_regex = build_include_regexp(include_parts)
+        self.__table_filter_exclude_regex = build_exclude_regexp(exclude_parts)
 
     def table_filter_regexp(self) -> str:
-        return r"^{}{}".format(self.table_filter_include_regex, self.table_filter_exclude_regex)
+        return r"^{}{}".format(self.__table_filter_include_regex, self.__table_filter_exclude_regex)
 
     def db_filter_regexp(self) -> str:
-        return r"^{}{}".format(self.db_filter_include_regex, self.db_filter_exclude_regex)
+        return r"^{}{}".format(self.__db_filter_include_regex, self.__db_filter_exclude_regex)
 
     def table_filter_exclude_regexp_as_include(self) -> str:
-        return self.table_filter_exclude_regex.replace("!", "=", 1)
+        return self.__table_filter_exclude_regex.replace("!", "=", 1)
 
     def db_filter_exclude_regexp_as_include(self) -> str:
-        return self.db_filter_exclude_regex.replace("!", "=", 1)
+        return self.__db_filter_exclude_regex.replace("!", "=", 1)
 
     def inject_system_dbs(self, system_dbs: List[str]):
-        self.system_table_parts = [r"{}\..*$".format(replace_glob(sd)) for sd in system_dbs]
-        self.system_db_parts = [r"{}$".format(replace_glob(sd)) for sd in system_dbs]
+        self.__system_table_parts = [r"{}\..*$".format(replace_glob(sd)) for sd in system_dbs]
+        self.__system_db_parts = [r"{}$".format(replace_glob(sd)) for sd in system_dbs]
 
-        self._build_db_filter_regexp()
-        self._build_table_filter_regexp()
+        self.__build_db_filter_regexp()
+        self.__build_table_filter_regexp()
 
     def check_inclusion(self) -> Dict[str, List[Tuple[str, str]]]:
         """
@@ -108,8 +108,8 @@ class DbTableFilter(object):
         类似 [('p%', 'p2???'), ('p%', 'p211'), ('p%', 'p4'), ('p%', 'p5')]
         """
         return {
-            "include-db": pattern_inclusion(self.include_db_patterns),
-            "exclude-db": pattern_inclusion(self.exclude_db_patterns),
-            "include-table": pattern_inclusion(self.include_table_patterns),
-            "exclude-table": pattern_inclusion(self.exclude_table_patterns),
+            "include-db": pattern_inclusion(self.__include_db_patterns),
+            "exclude-db": pattern_inclusion(self.__exclude_db_patterns),
+            "include-table": pattern_inclusion(self.__include_table_patterns),
+            "exclude-table": pattern_inclusion(self.__exclude_table_patterns),
         }

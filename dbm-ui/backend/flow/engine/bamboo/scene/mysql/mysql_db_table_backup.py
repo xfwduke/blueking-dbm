@@ -8,18 +8,16 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-import collections
 import logging
 import uuid
+from collections import defaultdict
 from dataclasses import asdict
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
-from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import ugettext as _
 
 from backend.configuration.constants import DBType
-from backend.db_meta.enums import ClusterType, InstanceInnerRole
-from backend.db_meta.exceptions import ClusterNotExistException, DBMetaBaseException
+from backend.db_meta.enums import ClusterType, InstanceInnerRole, InstanceStatus
 from backend.db_meta.models import Cluster
 from backend.flow.consts import DBA_SYSTEM_USER
 from backend.flow.engine.bamboo.scene.common.builder import Builder, SubBuilder
@@ -42,7 +40,7 @@ from backend.flow.utils.mysql.mysql_context_dataclass import MySQLBackupDemandCo
 logger = logging.getLogger("flow")
 
 
-class MySQLHADBTableBackupFlow(object):
+class MySQLDBTableBackupFlow(object):
     """
     支持跨云操作
     """
@@ -58,7 +56,7 @@ class MySQLHADBTableBackupFlow(object):
         "uid": "2022051612120001",
         "created_by": "xxx",
         "bk_biz_id": "152",
-        "ticket_type": "MYSQL_HA_DB_TABLE_BACKUP",
+        "ticket_type": "MYSQL_DB_TABLE_BACKUP",
         "infos": [
             {
                 "cluster_id": int,
@@ -73,33 +71,50 @@ class MySQLHADBTableBackupFlow(object):
         }
         增加单据临时ADMIN账号的添加和删除逻辑
         """
-        cluster_ids = [job["cluster_id"] for job in self.data["infos"]]
-        dup_cluster_ids = [item for item, count in collections.Counter(cluster_ids).items() if count > 1]
-        if dup_cluster_ids:
-            raise DBMetaBaseException(message="duplicate clusters found: {}".format(dup_cluster_ids))
-
-        backup_pipeline = Builder(
-            root_id=self.root_id, data=self.data, need_random_pass_cluster_ids=list(set(cluster_ids))
-        )
-        sub_pipes = []
+        # 合并重复集群
+        merged_jobs = defaultdict(list)
         for job in self.data["infos"]:
-            try:
-                cluster_obj = Cluster.objects.get(
-                    pk=job["cluster_id"], bk_biz_id=self.data["bk_biz_id"], cluster_type=ClusterType.TenDBHA.value
-                )
-            except ObjectDoesNotExist:
-                raise ClusterNotExistException(
-                    cluster_type=ClusterType.TenDBHA.value, cluster_id=job["cluster_id"], immute_domain=""
-                )
+            cluster_id = job["cluster_id"]
+            merged_jobs[cluster_id].append(job)
 
-            try:
-                instance_obj = cluster_obj.storageinstance_set.get(
-                    instance_inner_role=InstanceInnerRole.SLAVE.value, is_stand_by=True
-                )
-            except ObjectDoesNotExist:
-                raise DBMetaBaseException(message=_("{} standby slave 不存在".format(cluster_obj.immute_domain)))
+        backup_pipeline = Builder(root_id=self.root_id, data=self.data)
+        cluster_flows = []
+        for cluster_id, jobs in merged_jobs.items():
+            cluster_flows.append(
+                self._build_cluster_sub_flow(
+                    cluster_id=cluster_id,
+                    jobs=jobs,
+                ).build_sub_process(sub_name=_(""))
+            )
 
-            sub_pipe = SubBuilder(
+        backup_pipeline.add_parallel_sub_pipeline(sub_flow_list=cluster_flows)
+        logger.info(_("构建库表备份流程成功"))
+        backup_pipeline.run_pipeline(init_trans_data_class=MySQLBackupDemandContext())
+
+    def _build_cluster_sub_flow(self, cluster_id: int, jobs: List):
+        cluster_obj = Cluster.objects.get(pk=cluster_id, bk_biz_id=self.data["bk_biz_id"])
+        if cluster_obj.cluster_type == ClusterType.TenDBHA:
+            instance_obj = cluster_obj.storageinstance_set.get(
+                instance_inner_role=InstanceInnerRole.SLAVE.value, is_stand_by=True, status=InstanceStatus.RUNNING
+            )
+        else:
+            instance_obj = cluster_obj.storageinstance_set.filter(status=InstanceStatus.RUNNING).first()
+
+        cluster_flow = SubBuilder(root_id=self.root_id, data=self.data)
+        cluster_flow.add_act(
+            act_name=_("下发actuator介质"),
+            act_component_code=TransFileComponent.code,
+            kwargs=asdict(
+                DownloadMediaKwargs(
+                    bk_cloud_id=cluster_obj.bk_cloud_id,
+                    exec_ip=instance_obj.machine.ip,
+                    file_list=GetFileList(db_type=DBType.MySQL).get_db_actuator_package(),
+                )
+            ),
+        )
+
+        for job in jobs:
+            job_flow = SubBuilder(
                 root_id=self.root_id,
                 data={
                     **job,
@@ -116,32 +131,17 @@ class MySQLHADBTableBackupFlow(object):
                     "role": instance_obj.instance_role,
                 },
             )
-
-            sub_pipe.add_act(
+            job_flow.add_act(
                 act_name=_("构造mydumper正则"),
                 act_component_code=DatabaseTableFilterRegexBuilderComponent.code,
                 kwargs={},
             )
-
-            sub_pipe.add_act(
+            job_flow.add_act(
                 act_name=_("检查正则匹配"),
                 act_component_code=FilterDatabaseTableFromRegexComponent.code,
                 kwargs=asdict(BKCloudIdKwargs(bk_cloud_id=cluster_obj.bk_cloud_id)),
             )
-
-            sub_pipe.add_act(
-                act_name=_("下发actuator介质"),
-                act_component_code=TransFileComponent.code,
-                kwargs=asdict(
-                    DownloadMediaKwargs(
-                        bk_cloud_id=cluster_obj.bk_cloud_id,
-                        exec_ip=instance_obj.machine.ip,
-                        file_list=GetFileList(db_type=DBType.MySQL).get_db_actuator_package(),
-                    )
-                ),
-            )
-
-            sub_pipe.add_act(
+            job_flow.add_act(
                 act_name=_("执行库表备份"),
                 act_component_code=ExecuteDBActuatorScriptComponent.code,
                 kwargs=asdict(
@@ -152,17 +152,12 @@ class MySQLHADBTableBackupFlow(object):
                         get_mysql_payload_func=MysqlActPayload.mysql_backup_demand_payload.__name__,
                     )
                 ),
-                # write_payload_var="backup_report_response",
             )
-
-            sub_pipe.add_act(
+            job_flow.add_act(
                 act_name=_("关联备份id"),
                 act_component_code=MySQLLinkBackupIdBillIdComponent.code,
                 kwargs={},
             )
+            cluster_flow.add_sub_pipeline(sub_flow=job_flow.build_sub_process(sub_name=_("")))
 
-            sub_pipes.append(sub_pipe.build_sub_process(sub_name=_("{} 库表备份").format(cluster_obj.immute_domain)))
-
-        backup_pipeline.add_parallel_sub_pipeline(sub_flow_list=sub_pipes)
-        logger.info(_("构建库表备份流程成功"))
-        backup_pipeline.run_pipeline(init_trans_data_class=MySQLBackupDemandContext(), is_drop_random_user=True)
+        return cluster_flow
