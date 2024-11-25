@@ -20,15 +20,15 @@ from backend.flow.engine.bamboo.scene.mysql.import_sqlfile_flow import ImportSQL
 from backend.flow.engine.bamboo.scene.mysql.mysql_authorize_rules import MySQLAuthorizeRulesFlows
 from backend.flow.engine.bamboo.scene.mysql.mysql_checksum import MysqlChecksumFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_data_migrate_flow import MysqlDataMigrateFlow
+from backend.flow.engine.bamboo.scene.mysql.mysql_db_table_backup import MySQLDBTableBackupFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_edit_config_flow import MysqlEditConfigFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_fake_sql_semantic_check import MySQLFakeSemanticCheck
 from backend.flow.engine.bamboo.scene.mysql.mysql_flashback_flow import MysqlFlashbackFlow
+from backend.flow.engine.bamboo.scene.mysql.mysql_full_backup_flow import MySQLFullBackupFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_ha_apply_flow import MySQLHAApplyFlow
-from backend.flow.engine.bamboo.scene.mysql.mysql_ha_db_table_backup import MySQLHADBTableBackupFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_ha_destroy_flow import MySQLHADestroyFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_ha_disable_flow import MySQLHADisableFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_ha_enable_flow import MySQLHAEnableFlow
-from backend.flow.engine.bamboo.scene.mysql.mysql_ha_full_backup_flow import MySQLHAFullBackupFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_ha_metadata_import import TenDBHAMetadataImportFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_ha_standardize_flow import MySQLHAStandardizeFlow
 from backend.flow.engine.bamboo.scene.mysql.mysql_ha_upgrade import (
@@ -410,19 +410,18 @@ class MySQLController(BaseController):
         flow = MySQLMigrateClusterRemoteFlow(root_id=self.root_id, ticket_data=self.ticket_data)
         flow.migrate_cluster_flow()
 
-    def mysql_ha_db_table_backup_scene(self):
+    def mysql_db_table_backup_scene(self):
         """
-        TenDBHA 库表备份
+        MySQL 库表备份
         ticket_data 参数结构样例
         {
         "uid": "2022051612120001",
         "created_by": "xxx",
         "bk_biz_id": "152",
-        "ticket_type": "MYSQL_HA_DB_TABLE_BACKUP",
+        "ticket_type": "MYSQL_DB_TABLE_BACKUP",
         "infos": [
             {
                 "cluster_id": int,
-                "backup_on": str enum InstanceInnerRole
                 "db_patterns": ["db1%", "db2%"],
                 "ignore_dbs": ["db11", "db12", "db23"],
                 "table_patterns": ["tb_role%", "tb_mail%", "*"],
@@ -433,7 +432,7 @@ class MySQLController(BaseController):
         ]
         }
         """
-        flow = MySQLHADBTableBackupFlow(root_id=self.root_id, data=self.ticket_data)
+        flow = MySQLDBTableBackupFlow(root_id=self.root_id, data=self.ticket_data)
         flow.backup_flow()
 
     def mysql_ha_switch_scene(self):
@@ -502,7 +501,7 @@ class MySQLController(BaseController):
         flow.mysql_flashback_flow()
 
     def mysql_full_backup_scene(self):
-        flow = MySQLHAFullBackupFlow(root_id=self.root_id, data=self.ticket_data)
+        flow = MySQLFullBackupFlow(root_id=self.root_id, data=self.ticket_data)
         flow.full_backup_flow()
 
     def mysql_edit_config_scene(self):

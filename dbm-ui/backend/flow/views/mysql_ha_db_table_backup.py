@@ -35,6 +35,6 @@ class MySQLHADBTableBackup(FlowTestView):
         logger.info("define root_id: {}".format(root_id))
 
         c = MySQLController(root_id=root_id, ticket_data=request.data)
-        c.mysql_ha_db_table_backup_scene()
+        c.mysql_db_table_backup_scene()
 
         return Response({"root_id": root_id})

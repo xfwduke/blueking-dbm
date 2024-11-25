@@ -11,22 +11,19 @@ specific language governing permissions and limitations under the License.
 import copy
 import logging
 import uuid
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import asdict
 from typing import Dict, List, Optional
 
-from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import ugettext as _
 
 from backend.configuration.constants import DBType
 from backend.constants import IP_PORT_DIVIDER
-from backend.db_meta.enums import ClusterType, InstanceInnerRole, TenDBClusterSpiderRole
-from backend.db_meta.exceptions import ClusterNotExistException, DBMetaBaseException
+from backend.db_meta.enums import InstanceInnerRole, TenDBClusterSpiderRole
 from backend.db_meta.models import Cluster, StorageInstanceTuple
 from backend.flow.consts import DBA_SYSTEM_USER
 from backend.flow.engine.bamboo.scene.common.builder import Builder, SubBuilder, SubProcess
 from backend.flow.engine.bamboo.scene.common.get_file_list import GetFileList
-from backend.flow.engine.exceptions import MySQLBackupLocalException
 from backend.flow.plugins.components.collections.mysql.build_database_table_filter_regex import (
     DatabaseTableFilterRegexBuilderComponent,
 )
@@ -68,72 +65,27 @@ class TenDBClusterDBTableBackupFlow(object):
                 "table_patterns": ["tb_role%", "tb_mail%", "*"],
                 "ignore_tables": ["tb_role1", "tb_mail10"],
             },
-            ...
-            ...
             ]
         }
         增加单据临时ADMIN账号的添加和删除逻辑
         """
-        cluster_ids = [job["cluster_id"] for job in self.data["infos"]]
-        dup_cluster_ids = [item for item, count in Counter(cluster_ids).items() if count > 1]
-        if dup_cluster_ids:
-            raise DBMetaBaseException(message="duplicate clusters found: {}".format(dup_cluster_ids))
-
-        backup_pipeline = Builder(
-            root_id=self.root_id, data=self.data, need_random_pass_cluster_ids=list(set(cluster_ids))
-        )
-
-        cluster_pipes = []
+        # 合并重复集群
+        merged_jobs = defaultdict(list)
         for job in self.data["infos"]:
-            try:
-                cluster_obj = Cluster.objects.get(
-                    pk=job["cluster_id"], bk_biz_id=self.data["bk_biz_id"], cluster_type=ClusterType.TenDBCluster.value
-                )
-            except ObjectDoesNotExist:
-                raise ClusterNotExistException(
-                    cluster_type=ClusterType.TenDBCluster.value, cluster_id=job["cluster_id"], immute_domain=""
-                )
+            cluster_id = job["cluster_id"]
+            merged_jobs[cluster_id].append(job)
 
-            backup_id = uuid.uuid1()
+        backup_pipeline = Builder(root_id=self.root_id, data=self.data)
 
-            cluster_pipe = SubBuilder(
-                root_id=self.root_id,
-                data={
-                    **job,
-                    "uid": self.data["uid"],
-                    "created_by": self.data["created_by"],
-                    "bk_biz_id": self.data["bk_biz_id"],
-                    "ticket_type": self.data["ticket_type"],
-                    "backup_id": backup_id,
-                },
+        cluster_flow = []
+        for cluster_id, jobs in merged_jobs.items():
+            cluster_flow.append(
+                self._build_cluster_sub_flow(cluster_id=cluster_id, jobs=jobs).build_sub_process(
+                    sub_name=_("{} 库表备份".format(Cluster.objects.get(id=cluster_id).immute_domain))
+                )
             )
 
-            cluster_pipe.add_sub_pipeline(
-                sub_flow=self.backup_on_spider_ctl(backup_id=backup_id, job=job, cluster_obj=cluster_obj)
-            )
-
-            if job["backup_local"] == "remote":
-                cluster_pipe.add_parallel_sub_pipeline(
-                    sub_flow_list=self.backup_on_remote(backup_id=backup_id, job=job, cluster_obj=cluster_obj)
-                )
-            elif job["backup_local"] == "spider_mnt":
-                cluster_pipe.add_sub_pipeline(
-                    sub_flow=self.backup_on_spider_mnt(backup_id=backup_id, job=job, cluster_obj=cluster_obj)
-                )
-            else:
-                raise MySQLBackupLocalException(msg=_("不支持的备份位置 {}".format(job["backup_local"])))
-
-            cluster_pipe.add_act(
-                act_name=_("关联备份id"),
-                act_component_code=MySQLLinkBackupIdBillIdComponent.code,
-                kwargs={},
-            )
-
-            cluster_pipes.append(
-                cluster_pipe.build_sub_process(sub_name=_("{} 库表备份".format(cluster_obj.immute_domain)))
-            )
-
-        backup_pipeline.add_parallel_sub_pipeline(sub_flow_list=cluster_pipes)
+        backup_pipeline.add_parallel_sub_pipeline(sub_flow_list=cluster_flow)
         logger.info(_("构造库表备份流程成功"))
         backup_pipeline.run_pipeline(init_trans_data_class=MySQLBackupDemandContext(), is_drop_random_user=True)
 
@@ -337,3 +289,47 @@ class TenDBClusterDBTableBackupFlow(object):
             ),
         )
         return on_spider_mnt_pipe.build_sub_process(sub_name=_("spider_mnt库表备份"))
+
+    def _build_cluster_sub_flow(self, cluster_id: int, jobs: List):
+        cluster_obj = Cluster.objects.get(id=cluster_id)
+        cluster_flow = SubBuilder(root_id=self.root_id, data=self.data)
+
+        for job in jobs:
+            backup_id = uuid.uuid1()
+            job_flow = SubBuilder(
+                root_id=self.root_id,
+                data={
+                    **job,
+                    "uid": self.data["uid"],
+                    "created_by": self.data["created_by"],
+                    "bk_biz_id": self.data["bk_biz_id"],
+                    "ticket_type": self.data["ticket_type"],
+                    "backup_id": backup_id,
+                },
+            )
+            if job["backup_local"] == "remote":
+                job_flow.add_parallel_sub_pipeline(
+                    sub_flow_list=self.backup_on_remote(
+                        backup_id=backup_id,
+                        job=job,
+                        cluster_obj=cluster_obj,
+                    )
+                )
+            elif job["backup_local"] == "spider_mnt":
+                job_flow.add_sub_pipeline(
+                    sub_flow=self.backup_on_spider_mnt(
+                        backup_id=backup_id,
+                        job=job,
+                        cluster_obj=cluster_obj,
+                    )
+                )
+            job_flow.add_act(
+                act_name=_("关联备份id"),
+                act_component_code=MySQLLinkBackupIdBillIdComponent.code,
+                kwargs={},
+            )
+            subflow_name = "include db: {}, exclude db: {}, include table: {}, exclude table: {}".format(
+                job["db_patterns"], job["ignore_dbs"], job["table_patterns"], job["ignore_tables"]
+            )
+            cluster_flow.add_sub_pipeline(sub_flow=job_flow.build_sub_process(sub_name=_(subflow_name)))
+        return cluster_flow
