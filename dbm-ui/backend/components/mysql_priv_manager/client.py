@@ -92,6 +92,11 @@ class _DBPrivManagerApi(BaseApi):
             url="/priv/add_priv",
             description=_("添加授权"),
         )
+        self.authorize_rules_v2 = self.generate_data_api(
+            method="POST",
+            url="/priv/v2/add_priv",
+            description=_("添加授权 v2"),
+        )
         self.get_online_rules = self.generate_data_api(
             method="POST",
             url="/priv/get_online_rules",

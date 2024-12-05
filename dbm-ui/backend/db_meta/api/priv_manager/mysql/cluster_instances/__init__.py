@@ -9,6 +9,6 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from .tendbcluster import tendbcluster
-from .tendbha import tendbha
-from .tendbsingle import tendbsingle
+from .tendbcluster import bulk_tendbcluster, tendbcluster
+from .tendbha import bulk_tendbha, tendbha
+from .tendbsingle import bulk_tendbsingle, tendbsingle

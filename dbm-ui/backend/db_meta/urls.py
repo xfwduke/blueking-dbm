@@ -54,6 +54,21 @@ if env.SERVICE_ONLY:
             name="priv_manager-mysql-tendbcluster-cluster_instances",
         ),
         path(
+            "priv_manager/mysql/tendbsingle/bulk_cluster_instances",
+            views.priv_manager.mysql.tendbsingle_bulk_cluster_instances,
+            name="priv_manager-mysql-tendbsingle-bulk-cluster_instances",
+        ),
+        path(
+            "priv_manager/mysql/tendbha/bulk_cluster_instances",
+            views.priv_manager.mysql.tendbha_bulk_cluster_instances,
+            name="priv_manager-mysql-tendbha-bulk-cluster_instances",
+        ),
+        path(
+            "priv_manager/mysql/tendbcluster/bulk_cluster_instances",
+            views.priv_manager.mysql.tendbcluster_bulk_cluster_instances,
+            name="priv_manager-mysql-tendbcluster-bulk-cluster_instances",
+        ),
+        path(
             "priv_manager/biz_clusters",
             views.priv_manager.biz_clusters,
             name="priv_manager-biz_clusters",

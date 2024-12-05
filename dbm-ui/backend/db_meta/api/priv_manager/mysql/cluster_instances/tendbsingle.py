@@ -46,3 +46,11 @@ def tendbsingle(entry_name: str):
 
     except ObjectDoesNotExist:
         raise ClusterEntryNotExistException(entry=entry_name)
+
+
+def bulk_tendbsingle(entry_names: list):
+    res = []
+    for entry_name in entry_names:
+        res.append(tendbsingle(entry_name))
+
+    return res

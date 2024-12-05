@@ -69,3 +69,57 @@ def tendbcluster_cluster_instances(request: Request):
         )
     except Exception as e:
         return JsonResponse({"msg": "{}".format(e), "code": 1, "data": ""})
+
+
+@swagger_auto_schema(methods=["get"])
+@csrf_exempt
+@api_view(["GET"])
+def tendbsingle_bulk_cluster_instances(request: Request):
+    try:
+        return JsonResponse(
+            {
+                "msg": "",
+                "code": 0,
+                "data": api.priv_manager.mysql.cluster_instances.bulk_tendbsingle(
+                    entry_names=request.query_params.get("entry_names")
+                ),
+            }
+        )
+    except Exception as e:  # noqa
+        return JsonResponse({"msg": "{}".format(e), "code": 1, "data": ""})
+
+
+@swagger_auto_schema(methods=["get"])
+@csrf_exempt
+@api_view(["GET"])
+def tendbha_bulk_cluster_instances(request: Request):
+    try:
+        return JsonResponse(
+            {
+                "msg": "",
+                "code": 0,
+                "data": api.priv_manager.mysql.cluster_instances.bulk_tendbha(
+                    entry_names=request.query_params.get("entry_names")
+                ),
+            }
+        )
+    except Exception as e:  # noqa
+        return JsonResponse({"msg": "{}".format(e), "code": 1, "data": ""})
+
+
+@swagger_auto_schema(methods=["get"])
+@csrf_exempt
+@api_view(["GET"])
+def tendbcluster_bulk_cluster_instances(request: Request):
+    try:
+        return JsonResponse(
+            {
+                "msg": "",
+                "code": 0,
+                "data": api.priv_manager.mysql.cluster_instances.bulk_tendbcluster(
+                    entry_names=request.query_params.get("entry_names")
+                ),
+            }
+        )
+    except Exception as e:  # noqa
+        return JsonResponse({"msg": "{}".format(e), "code": 1, "data": ""})

@@ -147,3 +147,7 @@ class InstanceDetailSLZ(BaseProxyPassSerializer):
 
 class TendbInstancesSerializer(BaseProxyPassSerializer):
     entry_name = serializers.CharField(help_text=_("访问入口"))
+
+
+class BulkTendbInstancesSerializer(BaseProxyPassSerializer):
+    entry_names = serializers.ListSerializer(child=serializers.CharField(help_text=_("访问入口")))

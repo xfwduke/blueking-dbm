@@ -12,7 +12,11 @@ import logging
 from typing import Dict, Optional
 
 from backend.flow.engine.bamboo.scene.common.builder import Builder
-from backend.flow.engine.bamboo.scene.mysql.common.common_sub_flow import authorize_sub_flow, clone_rules_sub_flow
+from backend.flow.engine.bamboo.scene.mysql.common.common_sub_flow import (
+    authorize_sub_flow,
+    authorize_sub_flow_v2,
+    clone_rules_sub_flow,
+)
 
 logger = logging.getLogger("flow")
 
@@ -37,6 +41,21 @@ class MySQLAuthorizeRulesFlows(object):
         mysql_authorize_rules = Builder(root_id=self.root_id, data=self.data)
         mysql_authorize_rules.add_sub_pipeline(
             sub_flow=authorize_sub_flow(
+                root_id=self.root_id,
+                uid=self.data["uid"],
+                bk_biz_id=self.data["bk_biz_id"],
+                operator=self.data["created_by"],
+                rules_set=self.data["rules_set"],
+            )
+        )
+        mysql_authorize_rules.run_pipeline()
+
+    def authorize_mysql_rules_v2(self):
+        """定义mysql授权流程 v2"""
+
+        mysql_authorize_rules = Builder(root_id=self.root_id, data=self.data)
+        mysql_authorize_rules.add_sub_pipeline(
+            sub_flow=authorize_sub_flow_v2(
                 root_id=self.root_id,
                 uid=self.data["uid"],
                 bk_biz_id=self.data["bk_biz_id"],

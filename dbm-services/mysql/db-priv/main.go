@@ -1,6 +1,10 @@
 package main
 
 import (
+	"dbm-services/common/go-pubpkg/apm/metric"
+	"dbm-services/common/go-pubpkg/apm/trace"
+	v2 "dbm-services/mysql/priv-service/handler/v2"
+	"dbm-services/mysql/priv-service/service"
 	"dbm-services/mysql/priv-service/util"
 	"io"
 	"log/slog"
@@ -8,12 +12,8 @@ import (
 	"os"
 	"strings"
 
-	"dbm-services/common/go-pubpkg/apm/metric"
-	"dbm-services/common/go-pubpkg/apm/trace"
-	"dbm-services/mysql/priv-service/service"
-
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"dbm-services/mysql/priv-service/assests"
@@ -36,7 +36,7 @@ func main() {
 
 	// 元数据库 migration
 	if viper.GetBool("migrate") {
-		if err := dbMigrate(); err != nil && err != migrate.ErrNoChange {
+		if err := dbMigrate(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 			slog.Error("migrate失败", err)
 			os.Exit(0)
 		}
@@ -62,6 +62,8 @@ func main() {
 			context.String(http.StatusOK, "pong")
 		}}})
 	handler.RegisterRoutes(engine, "/priv", (&handler.PrivService{}).Routes())
+	handler.RegisterRoutes(engine, "/priv/v2", v2.Routes())
+
 	if err := engine.Run(viper.GetString("http.listenAddress")); err != nil {
 		slog.Error("注册服务失败", err)
 	}

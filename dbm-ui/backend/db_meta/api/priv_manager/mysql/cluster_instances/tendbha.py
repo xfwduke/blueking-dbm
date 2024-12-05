@@ -103,3 +103,11 @@ def tendbha(entry_name: str):
 
     except ObjectDoesNotExist:
         raise ClusterEntryNotExistException(entry=entry_name)
+
+
+def bulk_tendbha(entry_names: list):
+    res = []
+    for entry_name in entry_names:
+        res.append(tendbha(entry_name))
+
+    return res

@@ -56,6 +56,13 @@ class MySQLAuthorizeRulesSerializer(serializers.Serializer):
 
         return attrs
 
+    def _validate_conflict(self, attrs):
+        """
+        1. 检查 dbname 的模式冲突
+        2. 检查密码一致性
+        """
+        return attrs
+
 
 class MySQLExcelAuthorizeDataSerializer(PreCheckAuthorizeRulesSerializer):
     source_ips = serializers.ListField(help_text=_("ip列表"), child=serializers.CharField())

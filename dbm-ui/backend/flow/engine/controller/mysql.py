@@ -222,6 +222,12 @@ class MySQLController(BaseController):
         flow = MySQLAuthorizeRulesFlows(root_id=self.root_id, data=self.ticket_data)
         flow.authorize_mysql_rules()
 
+    def mysql_authorize_rules_v2(self):
+        """授权mysql权限场景"""
+
+        flow = MySQLAuthorizeRulesFlows(root_id=self.root_id, data=self.ticket_data)
+        flow.authorize_mysql_rules_v2()
+
     def mysql_clone_rules(self):
         """
         权限克隆mysql场景：

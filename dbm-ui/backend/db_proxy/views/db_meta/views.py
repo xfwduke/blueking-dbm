@@ -23,6 +23,7 @@ from backend.db_proxy.constants import SWAGGER_TAG
 from backend.db_proxy.views.db_meta.serializers import (
     BizClusterSerializer,
     BKCityNameSerializer,
+    BulkTendbInstancesSerializer,
     ClusterDetailSerializer,
     EntryDetailSerializer,
     FakeResetTendbHACluster,
@@ -281,6 +282,56 @@ class DBMetaApiProxyPassViewSet(BaseProxyPassViewSet):
     def tendbcluster_cluster_instances(self, request):
         validated_data = self.params_validate(self.get_serializer_class())
         data = api.priv_manager.mysql.cluster_instances.tendbcluster(entry_name=validated_data.get("entry_name"))
+        return Response(data)
+
+    @common_swagger_auto_schema(
+        operation_summary=_("[dbmeta]priv_manager批量查询tendbsingle集群实例信息"),
+        request_body=BulkTendbInstancesSerializer(),
+        tags=[SWAGGER_TAG],
+    )
+    @action(
+        methods=["POST"],
+        detail=False,
+        serializer_class=BulkTendbInstancesSerializer,
+        url_path="dbmeta/priv_manager/mysql/tendbsingle/bulk_cluster_instances",
+    )
+    def tendbsingle_bulk_cluster_instances(self, request):
+        validated_data = self.params_validate(self.get_serializer_class())
+        data = api.priv_manager.mysql.cluster_instances.bulk_tendbsingle(entry_names=validated_data.get("entry_names"))
+        return Response(data)
+
+    @common_swagger_auto_schema(
+        operation_summary=_("[dbmeta]priv_manager批量查询tendbha集群实例信息"),
+        request_body=BulkTendbInstancesSerializer(),
+        tags=[SWAGGER_TAG],
+    )
+    @action(
+        methods=["POST"],
+        detail=False,
+        serializer_class=BulkTendbInstancesSerializer,
+        url_path="dbmeta/priv_manager/mysql/tendbha/bulk_cluster_instances",
+    )
+    def tendbha_bulk_cluster_instances(self, request):
+        validated_data = self.params_validate(self.get_serializer_class())
+        data = api.priv_manager.mysql.cluster_instances.bulk_tendbha(entry_names=validated_data.get("entry_names"))
+        return Response(data)
+
+    @common_swagger_auto_schema(
+        operation_summary=_("[dbmeta]priv_manager批量查询tendbcluster集群实例信息"),
+        request_body=BulkTendbInstancesSerializer(),
+        tags=[SWAGGER_TAG],
+    )
+    @action(
+        methods=["POST"],
+        detail=False,
+        serializer_class=BulkTendbInstancesSerializer,
+        url_path="dbmeta/priv_manager/mysql/tendbcluster/bulk_cluster_instances",
+    )
+    def tendbcluster_bulk_cluster_instances(self, request):
+        validated_data = self.params_validate(self.get_serializer_class())
+        data = api.priv_manager.mysql.cluster_instances.bulk_tendbcluster(
+            entry_names=validated_data.get("entry_names")
+        )
         return Response(data)
 
     @common_swagger_auto_schema(
