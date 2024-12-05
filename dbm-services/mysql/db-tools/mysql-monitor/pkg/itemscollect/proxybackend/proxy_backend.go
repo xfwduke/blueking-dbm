@@ -12,7 +12,6 @@ package proxybackend
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"math/big"
@@ -84,22 +83,27 @@ func (c *Checker) Run() (msg string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.MonitorConfig.InteractTimeout)
 	defer cancel()
 
-	var backendInfo struct {
-		Ndx         sql.NullInt32  `db:"backend_ndx"`
-		Address     sql.NullString `db:"address"`
-		Stat        sql.NullString `db:"state"`
-		Type        sql.NullString `db:"type"`
-		Uuid        sql.NullString `db:"uuid"`
-		ClientCount sql.NullInt32  `db:"connected_clients"`
-	}
-	err = c.db.QueryRowxContext(ctx, `SELECT * FROM BACKENDS`).StructScan(&backendInfo)
+	backendInfo := make(map[string]interface{})
+	err = c.db.QueryRowxContext(
+		ctx,
+		`SELECT * FROM BACKENDS`,
+	).MapScan(backendInfo)
 	if err != nil {
 		slog.Error("query backends", slog.String("error", err.Error()))
 		return "", err
 	}
 
-	if backendAddr == "" || !backendInfo.Address.Valid || backendAddr != backendInfo.Address.String {
-		msg = fmt.Sprintf("cnf.backend=%s, mem.backend=%s", backendAddr, backendInfo.Address.String)
+	slog.Info("query backends: %v", slog.Any("backend info", backendInfo))
+
+	b, ok := backendInfo["address"].([]byte)
+	queryAddr := string(b)
+	slog.Info("query backends", slog.String("query addr", queryAddr))
+	if backendAddr == "" || !ok || backendAddr != queryAddr {
+		slog.Info("query backends",
+			slog.String("query addr", queryAddr),
+			slog.Bool("ok", ok),
+		)
+		msg = fmt.Sprintf("cnf.backend=%s, mem.backend=%s", backendAddr, queryAddr)
 		return msg, nil
 	}
 
