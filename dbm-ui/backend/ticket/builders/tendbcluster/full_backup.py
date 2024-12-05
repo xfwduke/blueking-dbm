@@ -153,10 +153,7 @@ class TenDBClusterFullBackUpDetailSerializer(TendbBaseOperateDetailSerializer):
                 bad.append(cluster_obj.immute_domain)
             elif (
                 backup_local in ["remote", "slave"]
-                and cluster_obj.storageinstance_set.filter(
-                    backup_local,
-                    is_stand_by=True,
-                )
+                and cluster_obj.storageinstance_set.filter(instance_inner_role=backup_local, is_stand_by=True)
                 .exclude(status=InstanceStatus.RUNNING)
                 .exists()
             ):

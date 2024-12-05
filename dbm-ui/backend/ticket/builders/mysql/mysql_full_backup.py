@@ -161,5 +161,5 @@ class MySQLFullBackupFlowParamBuilder(builders.FlowParamBuilder):
 class TenDBHAFullBackupFlowBuilder(BaseMySQLHATicketFlowBuilder):
     serializer = MySQLFullBackupDetailSerializer
     inner_flow_builder = MySQLFullBackupFlowParamBuilder
-    inner_flow_name = _("TenDBHA 全库备份执行")
+    inner_flow_name = _("MySQL 全库备份执行")
     retry_type = FlowRetryType.MANUAL_RETRY

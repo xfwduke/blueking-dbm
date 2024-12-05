@@ -143,5 +143,5 @@ class MySQLDBTableBackupFlowParamBuilder(builders.FlowParamBuilder):
 class TenDBHADBTableBackupFlowBuilder(BaseMySQLHATicketFlowBuilder):
     serializer = MySQLDBTableBackupDetailSerializer
     inner_flow_builder = MySQLDBTableBackupFlowParamBuilder
-    inner_flow_name = _("TenDBHA 库表备份执行")
+    inner_flow_name = _("MySQL 库表备份执行")
     retry_type = FlowRetryType.MANUAL_RETRY
