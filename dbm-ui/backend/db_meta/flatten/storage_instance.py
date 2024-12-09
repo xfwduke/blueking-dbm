@@ -14,7 +14,7 @@ from typing import Dict, List
 
 from django.db.models import F, QuerySet
 
-from backend.db_meta.enums import ClusterEntryType, ClusterPhase
+from backend.db_meta.enums import ClusterEntryType, ClusterPhase, InstanceInnerRole, InstancePhase, InstanceStatus
 from backend.db_meta.enums.extra_process_type import ExtraProcessType
 from backend.db_meta.flatten.machine import _machine_prefetch, _single_machine_cc_info, _single_machine_city_info
 from backend.db_meta.models import StorageInstance
@@ -29,8 +29,10 @@ def storage_instance(storages: QuerySet) -> List[Dict]:
             *_machine_prefetch(),
             "as_ejector",
             "as_ejector__receiver__machine",
+            "as_ejector__receiver__cluster",
             "as_receiver",
             "as_receiver__ejector__machine",
+            "as_receiver__ejector__cluster",
             "proxyinstance_set",
             "proxyinstance_set__machine",
             "bind_entry",
@@ -67,7 +69,13 @@ def storage_instance(storages: QuerySet) -> List[Dict]:
         }
 
         receiver = []
-        for e in ins.as_ejector.filter(receiver__cluster=F("ejector__cluster")):
+
+        for e in ins.as_ejector.filter(
+            receiver__cluster=F("ejector__cluster"),
+            receiver__status=InstanceStatus.RUNNING.value,
+            receiver__instance_inner_role=InstanceInnerRole.SLAVE.value,
+            receiver__phase=InstancePhase.ONLINE.value,
+        ):
             rinfo = {
                 "ip": e.receiver.machine.ip,
                 "port": e.receiver.port,
@@ -78,7 +86,12 @@ def storage_instance(storages: QuerySet) -> List[Dict]:
         info["receiver"] = receiver
 
         ejector = []
-        for r in ins.as_receiver.filter(ejector__cluster=F("receiver__cluster")):
+        for r in ins.as_receiver.filter(
+            ejector__cluster=F("receiver__cluster"),
+            ejector__status=InstanceStatus.RUNNING.value,
+            ejector__instance_inner_role__in=[InstanceInnerRole.MASTER.value, InstanceInnerRole.REPEATER.value],
+            ejector__phase=InstancePhase.ONLINE.value,
+        ):
             einfo = {
                 "ip": r.ejector.machine.ip,
                 "port": r.ejector.port,
