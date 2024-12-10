@@ -41,8 +41,16 @@ func transDBTable(conn *sqlx.Conn, from, to, tableName string) ([]string, error)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// 这里的表是 backup others 新建出来的
 	_, err := conn.ExecContext(
+		ctx,
+		`SET FOREIGN_KEY_CHECKS=0`,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 这里的表是 backup others 新建出来的
+	_, err = conn.ExecContext(
 		ctx,
 		fmt.Sprintf("DROP TABLE IF EXISTS `%s`.`%s`;", to, tableName),
 	)
