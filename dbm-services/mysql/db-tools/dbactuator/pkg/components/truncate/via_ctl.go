@@ -173,10 +173,22 @@ func (c *ViaCtlComponent) dropSourceTables() error {
 	return nil
 }
 
+// 如果库下面有很多表, 直接 drop database 很容易超时
+// 得循环起来先一个一个把表 drop 了
 func (c *ViaCtlComponent) dropSourceDBs() error {
 	for db := range c.dbTablesMap {
 		stageDBName := generateStageDBName(c.Param.StageDBHeader, c.Param.FlowTimeStr, db)
-		err := rpkg.DropDB(c.dbConn, db, stageDBName, true)
+
+		logger.Info(fmt.Sprintf("drop source dbs %v should drop it's tables", c.dbTablesMap[db]))
+
+		err := tpkg.SafeDropSourceTables(c.dbConn, db, stageDBName, c.dbTablesMap[db])
+		if err != nil {
+			logger.Error("drop source tables %v failed: ", c.dbTablesMap[db], err.Error())
+			return err
+		}
+		logger.Info("drop source tables %v success", c.dbTablesMap[db])
+
+		err = rpkg.DropDB(c.dbConn, db, stageDBName, true)
 		if err != nil {
 			logger.Error(
 				"drop db %s failed: %s", db, err.Error(),

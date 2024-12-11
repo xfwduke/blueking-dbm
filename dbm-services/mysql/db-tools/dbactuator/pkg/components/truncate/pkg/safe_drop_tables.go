@@ -29,7 +29,7 @@ func safeDropSourceTable(conn *sqlx.Conn, dbName, stageDBName, tableName string)
 		return fmt.Errorf("table `%s` does not exist in `%s`", tableName, stageDBName)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	// 留着这里, drop table 不需要预处理触发器
