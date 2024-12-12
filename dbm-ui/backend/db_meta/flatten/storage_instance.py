@@ -12,7 +12,7 @@ import logging
 from collections import defaultdict
 from typing import Dict, List
 
-from django.db.models import F, QuerySet
+from django.db.models import QuerySet
 
 from backend.db_meta.enums import ClusterEntryType, ClusterPhase, InstanceInnerRole, InstancePhase, InstanceStatus
 from backend.db_meta.enums.extra_process_type import ExtraProcessType
@@ -47,7 +47,7 @@ def storage_instance(storages: QuerySet) -> List[Dict]:
     cluster_ids = [cluster.id for ins in storages_list for cluster in ins.cluster.all()]
     dumper_infos: Dict[str, Dict[str, List]] = defaultdict(lambda: defaultdict(list))
     for dumper in ExtraProcessInstance.objects.filter(
-        cluster_id__in=cluster_ids, proc_type=ExtraProcessType.TBINLOGDUMPER, phase=ClusterPhase.ONLINE.value
+        cluster_id__in=cluster_ids, proc_type=ExtraProcessType.TBINLOGDUMPER, phase=ClusterPhase.ONLINE
     ):
         dumper_infos[dumper.cluster_id][dumper.extra_config.get("source_data_ip", "")].append(dumper)
     res = []
@@ -69,36 +69,39 @@ def storage_instance(storages: QuerySet) -> List[Dict]:
         }
 
         receiver = []
+        for tp in ins.as_ejector.all():
+            if (
+                tp.ejector.cluster.all()[0].id == tp.receiver.cluster.all()[0].id
+                and tp.receiver.status == InstanceStatus.RUNNING
+                and tp.receiver.instance_inner_role == InstanceInnerRole.SLAVE
+                and tp.receiver.phase == InstancePhase.ONLINE
+            ):
+                rinfo = {
+                    "ip": tp.receiver.machine.ip,
+                    "port": tp.receiver.port,
+                    "status": tp.receiver.status,
+                    "is_stand_by": tp.receiver.is_stand_by,
+                }
+                receiver.append(rinfo)
 
-        for e in ins.as_ejector.filter(
-            receiver__cluster=F("ejector__cluster"),
-            receiver__status=InstanceStatus.RUNNING.value,
-            receiver__instance_inner_role=InstanceInnerRole.SLAVE.value,
-            receiver__phase=InstancePhase.ONLINE.value,
-        ):
-            rinfo = {
-                "ip": e.receiver.machine.ip,
-                "port": e.receiver.port,
-                "status": e.receiver.status,
-                "is_stand_by": e.receiver.is_stand_by,
-            }
-            receiver.append(rinfo)
         info["receiver"] = receiver
 
         ejector = []
-        for r in ins.as_receiver.filter(
-            ejector__cluster=F("receiver__cluster"),
-            ejector__status=InstanceStatus.RUNNING.value,
-            ejector__instance_inner_role__in=[InstanceInnerRole.MASTER.value, InstanceInnerRole.REPEATER.value],
-            ejector__phase=InstancePhase.ONLINE.value,
-        ):
-            einfo = {
-                "ip": r.ejector.machine.ip,
-                "port": r.ejector.port,
-                "status": r.ejector.status,
-                "is_stand_by": r.ejector.is_stand_by,
-            }
-            ejector.append(einfo)
+        for tp in ins.as_receiver.all():
+            if (
+                tp.ejector.cluster.all()[0].id == tp.receiver.cluster.all()[0].id
+                and tp.ejector.status == InstanceStatus.RUNNING
+                and tp.ejector.instance_inner_role in [InstanceInnerRole.MASTER, InstanceInnerRole.REPEATER]
+                and tp.ejector.phase == InstancePhase.ONLINE
+            ):
+                einfo = {
+                    "ip": tp.ejector.machine.ip,
+                    "port": tp.ejector.port,
+                    "status": tp.ejector.status,
+                    "is_stand_by": tp.ejector.is_stand_by,
+                }
+                ejector.append(einfo)
+
         info["ejector"] = ejector
 
         bind_entry = defaultdict(list)
