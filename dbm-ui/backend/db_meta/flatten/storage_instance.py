@@ -70,8 +70,12 @@ def storage_instance(storages: QuerySet) -> List[Dict]:
 
         receiver = []
         for tp in ins.as_ejector.all():
+            ejector_clusters = list(tp.ejector.cluster.all())
+            receiver_clusters = list(tp.receiver.cluster.all())
             if (
-                tp.ejector.cluster.all()[0].id == tp.receiver.cluster.all()[0].id
+                len(ejector_clusters) > 0
+                and len(receiver_clusters) > 0
+                and ejector_clusters[0].id == receiver_clusters[0].id
                 and tp.receiver.status == InstanceStatus.RUNNING
                 and tp.receiver.instance_inner_role == InstanceInnerRole.SLAVE
                 and tp.receiver.phase == InstancePhase.ONLINE
@@ -88,8 +92,12 @@ def storage_instance(storages: QuerySet) -> List[Dict]:
 
         ejector = []
         for tp in ins.as_receiver.all():
+            ejector_clusters = list(tp.ejector.cluster.all())
+            receiver_clusters = list(tp.receiver.cluster.all())
             if (
-                tp.ejector.cluster.all()[0].id == tp.receiver.cluster.all()[0].id
+                len(ejector_clusters) > 0
+                and len(receiver_clusters) > 0
+                and ejector_clusters[0].id == receiver_clusters[0].id
                 and tp.ejector.status == InstanceStatus.RUNNING
                 and tp.ejector.instance_inner_role in [InstanceInnerRole.MASTER, InstanceInnerRole.REPEATER]
                 and tp.ejector.phase == InstancePhase.ONLINE
