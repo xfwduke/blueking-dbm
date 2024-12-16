@@ -8,14 +8,13 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-
 import logging
+from collections import defaultdict
 
 from django.utils.translation import ugettext as _
 from pipeline.component_framework.component import Component
 
 from backend.components.mysql_priv_manager.client import DBPrivManagerApi
-from backend.db_meta.enums import InstanceStatus
 from backend.db_meta.exceptions import ClusterNotExistException
 from backend.db_meta.models import Cluster
 from backend.flow.plugins.components.collections.common.base_service import BaseService
@@ -31,42 +30,14 @@ class AddTempUserForClusterService(BaseService):
     单据是以集群维度来添加，如果单据涉及到集群，应该统一添加账号密码，以便后续操作方便
     """
 
-    def __add_priv(self, params):
-        """
-        定义添加临时账号的内置方法
-        """
-
-        try:
-            DBPrivManagerApi.add_priv_without_account_rule(params)
-            self.log_info(_("在[{}]创建添加账号成功").format(params["address"]))
-        except Exception as e:  # pylint: disable=broad-except
-            self.log_error(_("[{}]添加用户接口异常，相关信息: {}").format(params["address"], e))
-            return False
-
-        return True
-
     def _execute(self, data, parent_data, callback=None) -> bool:
         kwargs = data.get_one_of_inputs("kwargs")
         global_data = data.get_one_of_inputs("global_data")
 
         encrypt_switch_pwd = global_data["job_root_id"]
-        common_param = {
-            "bk_cloud_id": -1,
-            "bk_biz_id": int(global_data["bk_biz_id"]),
-            "operator": global_data["created_by"],
-            "user": generate_mysql_tmp_user(global_data["job_root_id"]),
-            "psw": encrypt_switch_pwd,
-            "hosts": [],
-            "dbname": "%",
-            "dml_ddl_priv": "",
-            "global_priv": "all privileges",
-            "address": "",
-            "role": "",
-        }
 
-        err_num = 0
+        bk_cloud_instance_map = defaultdict(list)
         for cluster_id in kwargs["cluster_ids"]:
-            # 获取每个cluster_id对应的对象
             try:
                 cluster = Cluster.objects.get(id=cluster_id, bk_biz_id=global_data["bk_biz_id"])
             except Cluster.DoesNotExist:
@@ -74,37 +45,29 @@ class AddTempUserForClusterService(BaseService):
                     cluster_id=cluster_id, bk_biz_id=global_data["bk_biz_id"], message=_("集群不存在")
                 )
 
-            # 获取每套集群的云区域id
-            common_param["bk_cloud_id"] = cluster.bk_cloud_id
-
             # 获取每套集群的所有需要添加临时的账号
             instance_list = get_instance_with_random_job(
                 cluster=cluster, ticket_type=global_data.get("ticket_type", "test")
             )
+            bk_cloud_instance_map[cluster.id].extend([ele["instance"] for ele in instance_list])
 
-            # 开始遍历集群每个实例，添加临时账号
-            for inst in instance_list:
-                if not inst.get("priv_role"):
-                    self.log_error(_("不支持改实例的主机类型授权[{}]: machine_type: {}").format(inst.ip_port, inst.machine_type))
-                    err_num = err_num + 1
-                    continue
+        err_cnt = 0
+        for bk_cloud_id, instance_list in bk_cloud_instance_map.items():
+            try:
+                DBPrivManagerApi.add_priv_without_account_rule_v2(
+                    {
+                        "bk_cloud_id": bk_cloud_id,
+                        "user": generate_mysql_tmp_user(global_data["job_root_id"]),
+                        "psw": encrypt_switch_pwd,
+                        "addresses": instance_list,
+                    }
+                )
+                self.log_info(_("创建临时账号成功"))
+            except Exception as e:  # pylint: disable=broad-except
+                self.log_error(_("添加用户异常: {}").format(e))
+                err_cnt += 1
 
-                # 按照实例维度进行添加账号
-                common_param["address"] = inst["instance"]
-                common_param["hosts"] = ["localhost", inst["instance"].split(":")[0]]
-                common_param["role"] = inst["priv_role"]
-                if not self.__add_priv(common_param):
-                    if inst["cmdb_status"] == InstanceStatus.RUNNING:
-                        # 如果实例是running状态，应该记录错误，并且返回异常
-                        err_num = err_num + 1
-                    else:
-                        # 如果是非running状态，标记warning信息，但不作异常处理
-                        self.log_warning(f"[{inst['instance']} is not running in dbm [{inst['cmdb_status']}],ignore]")
-                        continue
-
-        if err_num > 0:
-            # 有错误先返回则直接返回异常
-            self.log_error("instances add priv failed")
+        if err_cnt > 0:
             return False
 
         return True

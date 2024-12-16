@@ -36,7 +36,7 @@ from backend.flow.plugins.components.collections.common.install_nodeman_plugin i
     InstallNodemanPluginServiceComponent,
 )
 from backend.flow.plugins.components.collections.common.sa_idle_check import CheckMachineIdleComponent
-from backend.flow.plugins.components.collections.mysql.authorize_rule_v2 import AuthorizeRulesV2Component
+from backend.flow.plugins.components.collections.mysql.authorize_rules_v2 import AuthorizeRulesV2Component
 from backend.flow.plugins.components.collections.mysql.authorize_rules import AuthorizeRulesComponent
 from backend.flow.plugins.components.collections.mysql.check_client_connections import CheckClientConnComponent
 from backend.flow.plugins.components.collections.mysql.clone_rules import CloneRulesComponent
@@ -955,6 +955,11 @@ def authorize_sub_flow(root_id: str, uid: str, bk_biz_id: int, operator: str, ru
 
 
 def authorize_sub_flow_v2(root_id: str, uid: str, bk_biz_id: int, operator: str, rules_set: list):
+    """
+    授权这一套参数流转设计的非常的奇怪
+    1. ticket builder 中的 serializer 没有 rules_set, 用 cache.get 动态读取, 所以也没有结构描述
+    2. MySQLExcelAuthorizeDataSerializer 的 privileges 没有结构描述
+    """
     sub_pipeline = SubBuilder(root_id=root_id, data={"uid": uid})
 
     # 获得用户规则字典

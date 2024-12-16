@@ -6,6 +6,7 @@ import (
 	"dbm-services/mysql/priv-service/service/v2/internal"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -38,6 +39,8 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 	c.SourceIPs = internal.UniqueStringSlice(c.SourceIPs)
 	// targetInstance 传入的其实全是域名
 	c.TargetInstances = internal.UniqueStringSlice(c.TargetInstances)
+
+	slog.Info("add priv", slog.String("source ips", strings.Join(c.SourceIPs, ",")))
 
 	// 写审计日志
 	service.AddPrivLog(
@@ -80,7 +83,7 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 	clientIps, workingMySQLInstances := c.prepareMySQLPayload(targetMetaInfos)
 	slog.Info(
 		"add priv",
-		slog.Any("clientIps", clientIps),
+		slog.String("clientIps", strings.Join(clientIps, ",")),
 		slog.Any("workingMySQLInstances", workingMySQLInstances),
 	)
 
@@ -111,6 +114,6 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 		return errors.New(string(b))
 	}
 
-	slog.Info("add priv finish", slog.Any("reports", reports))
+	slog.Info("add priv finish")
 	return nil
 }

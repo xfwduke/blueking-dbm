@@ -129,6 +129,16 @@ class _DBPrivManagerApi(BaseApi):
             url="/priv/add_priv_without_account_rule",
             description=_("mysql实例创建临时账号(切换专属接口)"),
         )
+        self.add_priv_without_account_rule_v2 = self.generate_data_api(
+            method="POST",
+            url="/priv/v2/add_priv_without_account_rule",
+            description=_("mysql实例创建临时账号 v2"),
+        )
+        self.drop_job_temp_account_v2 = self.generate_data_api(
+            method="POST",
+            url="/priv/v2/drop_job_temp_account",
+            description=_("mysql实例删除临时账号 v2"),
+        )
         self.modify_admin_password = self.generate_data_api(
             method="POST",
             url="/priv/modify_admin_password",
