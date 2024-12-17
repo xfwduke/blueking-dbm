@@ -36,8 +36,8 @@ from backend.flow.plugins.components.collections.common.install_nodeman_plugin i
     InstallNodemanPluginServiceComponent,
 )
 from backend.flow.plugins.components.collections.common.sa_idle_check import CheckMachineIdleComponent
-from backend.flow.plugins.components.collections.mysql.authorize_rule_v2 import AuthorizeRulesV2Component
 from backend.flow.plugins.components.collections.mysql.authorize_rules import AuthorizeRulesComponent
+from backend.flow.plugins.components.collections.mysql.authorize_rules_v2 import AuthorizeRulesV2Component
 from backend.flow.plugins.components.collections.mysql.check_client_connections import CheckClientConnComponent
 from backend.flow.plugins.components.collections.mysql.clone_rules import CloneRulesComponent
 from backend.flow.plugins.components.collections.mysql.exec_actuator_script import ExecuteDBActuatorScriptComponent

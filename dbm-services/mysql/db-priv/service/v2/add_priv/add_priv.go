@@ -6,6 +6,7 @@ import (
 	"dbm-services/mysql/priv-service/service/v2/internal"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -17,7 +18,9 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 		slog.String("jsonPara", jsonPara),
 	)
 
-	if c.ClusterType == internal.ClusterTypeSqlServerHA || c.ClusterType == internal.ClusterTypeSqlServer || c.ClusterType == internal.ClusterTypeSqlServerSingle {
+	if c.ClusterType == internal.ClusterTypeSqlServerHA ||
+		c.ClusterType == internal.ClusterTypeSqlServer ||
+		c.ClusterType == internal.ClusterTypeSqlServerSingle {
 		return c.AddPrivForSqlserver(jsonPara)
 	}
 
@@ -39,6 +42,8 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 	// targetInstance 传入的其实全是域名
 	c.TargetInstances = internal.UniqueStringSlice(c.TargetInstances)
 
+	slog.Info("add priv", slog.String("source ips", strings.Join(c.SourceIPs, ",")))
+
 	// 写审计日志
 	service.AddPrivLog(
 		service.PrivLog{
@@ -56,6 +61,7 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 		slog.Error("add priv", slog.String("err", err.Error()))
 		return err
 	}
+	slog.Info("add priv", slog.Any("target meta infos", targetMetaInfos))
 
 	/*
 		TenDBSingle 授权是在存储实例操作
@@ -64,6 +70,7 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 	*/
 
 	// 开白名单
+	// proxy 白名单是前置集中开, 所有出错了直接返回
 	if c.ClusterType == internal.ClusterTypeTenDBHA {
 		err = c.addWhiteList(targetMetaInfos)
 		if err != nil {
@@ -80,7 +87,7 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 	clientIps, workingMySQLInstances := c.prepareMySQLPayload(targetMetaInfos)
 	slog.Info(
 		"add priv",
-		slog.Any("clientIps", clientIps),
+		slog.String("clientIps", strings.Join(clientIps, ",")),
 		slog.Any("workingMySQLInstances", workingMySQLInstances),
 	)
 
@@ -96,6 +103,8 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 		slog.String("accountAndRuleDetails", accountAndRuleDetails.String()),
 	)
 
+	// err 是调用函数出错, 直接报错返回
+	// reports 是实施授权的报告
 	reports, err := c.addOnMySQL(clientIps, workingMySQLInstances, accountAndRuleDetails)
 	if err != nil {
 		slog.Error("add priv", slog.String("err", err.Error()))
@@ -111,6 +120,6 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 		return errors.New(string(b))
 	}
 
-	slog.Info("add priv finish", slog.Any("reports", reports))
+	slog.Info("add priv finish")
 	return nil
 }
