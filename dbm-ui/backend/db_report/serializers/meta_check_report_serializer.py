@@ -8,32 +8,12 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-import logging
+from rest_framework import serializers
 
-from celery.schedules import crontab
-
-from backend.db_meta.enums import ClusterType
-from backend.db_meta.models import Cluster
-from backend.db_periodic_task.local_tasks.register import register_periodic_task
 from backend.db_report.models import MetaCheckReport
 
-from .check_redis_instance import check_redis_instance
-from .mysql_cluster_topo.tendbha import health_check
 
-logger = logging.getLogger("celery")
-
-
-@register_periodic_task(run_every=crontab(minute=3, hour=2))
-def db_meta_check_task():
-    """
-    巡检校验元数据
-    """
-    check_redis_instance()
-
-
-@register_periodic_task(run_every=crontab(hour=2, minute=30))
-def tendbha_topo_daily_check():
-    for c in Cluster.objects.filter(cluster_type=ClusterType.TenDBHA):
-        r: MetaCheckReport
-        for r in health_check(c.id):
-            r.save()
+class MetaCheckReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MetaCheckReport
+        fields = "__all__"

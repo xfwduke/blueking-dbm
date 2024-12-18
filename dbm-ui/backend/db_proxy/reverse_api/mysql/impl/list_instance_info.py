@@ -34,7 +34,9 @@ def list_instance_info(bk_cloud_id: int, ip: str, port_list: Optional[List[int]]
 
 def list_storageinstance_info(q: Q) -> List:
     res = []
-    for i in StorageInstance.objects.filter(q):
+    for i in StorageInstance.objects.filter(q).prefetch_related(
+        "as_ejector__receiver__machine", "as_receiver__ejector__machine", "machine"
+    ):
         receivers = []
         ejectors = []
         for t in i.as_ejector.all():
@@ -71,7 +73,7 @@ def list_storageinstance_info(q: Q) -> List:
 
 def list_proxyinstance_info(q: Q) -> List:
     res = []
-    for i in ProxyInstance.objects.filter(q):
+    for i in ProxyInstance.objects.filter(q).prefetch_related("machine"):
         res.append(
             {
                 "ip": i.machine.ip,
