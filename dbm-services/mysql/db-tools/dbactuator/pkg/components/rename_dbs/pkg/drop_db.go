@@ -124,6 +124,12 @@ func isTableTransClean(conn *sqlx.Conn, from, to string) (bool, error) {
 		return false, err
 	}
 
+	defer func() {
+		for _, t := range tables {
+			flushTable(conn, from, to, t)
+		}
+	}()
+
 	for _, table := range tables {
 		yes, err := IsTableExistsIn(conn, table, to)
 		if err != nil {
