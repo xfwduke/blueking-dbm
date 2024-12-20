@@ -15,24 +15,24 @@ from django.utils.translation import ugettext_lazy as _
 
 from backend.bk_web.swagger import common_swagger_auto_schema
 from backend.db_proxy.reverse_api.base_reverse_api_view import BaseReverseApiView
-from backend.db_proxy.reverse_api.common.impl import list_nginx_ips
+from backend.db_proxy.reverse_api.common.impl import list_nginx_addrs
 from backend.db_proxy.reverse_api.decorators import reverse_api
 
 logger = logging.getLogger("root")
 
 
 class CommonReverseApiView(BaseReverseApiView):
-    @common_swagger_auto_schema(operation_summary=_("获取NGINX IP"))
-    @reverse_api(url_path="list_nginx_ips")
-    def list_nginx_ips(self, request, *args, **kwargs):
+    @common_swagger_auto_schema(operation_summary=_("获取NGINX 地址"))
+    @reverse_api(url_path="list_nginx_addrs")
+    def list_nginx_addrs(self, request, *args, **kwargs):
         """
-        返回特定云区域的 NGINX IP 列表
+        返回特定云区域的 NGINX 地址 列表
         param: bk_cloud_id: int
-        return: ["ip1", "ip2", ...]
+        return: ["ip1:90", "ip2:90", ...]
         """
         bk_cloud_id, _, _ = self.get_api_params()
         logger.info(f"bk_cloud_id: {bk_cloud_id}")
-        res = list_nginx_ips(bk_cloud_id=bk_cloud_id)
+        res = list_nginx_addrs(bk_cloud_id=bk_cloud_id)
         logger.info(f"res: {res}")
 
         return JsonResponse(

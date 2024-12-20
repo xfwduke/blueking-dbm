@@ -35,7 +35,7 @@ def list_instance_info(bk_cloud_id: int, ip: str, port_list: Optional[List[int]]
 def list_storageinstance_info(q: Q) -> List:
     res = []
     for i in StorageInstance.objects.filter(q).prefetch_related(
-        "as_ejector__receiver__machine", "as_receiver__ejector__machine", "machine"
+        "as_ejector__receiver__machine", "as_receiver__ejector__machine", "machine", "cluster"
     ):
         receivers = []
         ejectors = []
@@ -58,8 +58,11 @@ def list_storageinstance_info(q: Q) -> List:
             {
                 "ip": i.machine.ip,
                 "port": i.port,
+                "immute_domain": i.cluster.all()[0].immute_domain,
                 "phase": i.phase,
                 "status": i.status,
+                "access_layer": i.access_layer,
+                "machine_type": i.machine_type,
                 "is_standby": i.is_stand_by,
                 "instance_role": i.instance_role,
                 "instance_inner_role": i.instance_inner_role,
@@ -73,13 +76,26 @@ def list_storageinstance_info(q: Q) -> List:
 
 def list_proxyinstance_info(q: Q) -> List:
     res = []
-    for i in ProxyInstance.objects.filter(q).prefetch_related("machine"):
+    for i in ProxyInstance.objects.filter(q).prefetch_related("machine", "storageinstance__machine", "cluster"):
+        storageinstance_list = []
+        for si in i.storageinstance.all():
+            storageinstance_list.append(
+                {
+                    "ip": si.machine.ip,
+                    "port": si.port,
+                }
+            )
+
         res.append(
             {
                 "ip": i.machine.ip,
                 "port": i.port,
+                "immute_domain": i.cluster.all()[0].immute_domain,
                 "phase": i.phase,
                 "status": i.status,
+                "access_layer": i.access_layer,
+                "machine_type": i.machine_type,
+                "storageinstance_list": storageinstance_list,
             }
         )
 
