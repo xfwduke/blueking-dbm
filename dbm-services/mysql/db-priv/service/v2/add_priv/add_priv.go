@@ -4,7 +4,6 @@ import (
 	"dbm-services/common/go-pubpkg/errno"
 	"dbm-services/mysql/priv-service/service"
 	"dbm-services/mysql/priv-service/service/v2/internal"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
@@ -139,12 +138,14 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 	}()
 
 	var errCollect error
-	var reportCollect map[string][]string
+	reportCollect := make(map[string][]string, 0)
 	for {
 		select {
 		case err := <-errChan:
+			slog.Error("add priv collect error", slog.String("err", err.Error()))
 			errCollect = errors.Join(errCollect, err)
 		case report := <-reportChan:
+			slog.Info("add priv collect report", slog.Any("report", report))
 			for k, v := range report {
 				if _, ok := reportCollect[k]; !ok {
 					reportCollect[k] = []string{}
@@ -156,17 +157,20 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 			slog.Info("receive quit signal")
 			if errCollect != nil {
 				slog.Error("add priv", slog.String("err", errCollect.Error()))
-				return errCollect
+				return errno.GrantPrivilegesFail.Add("\n" + errCollect.Error() + "\n")
 			}
 
-			if reportCollect != nil {
+			if len(reportCollect) > 0 {
 				slog.Error("add priv", slog.Any("reportCollect", reportCollect))
-				b, err := json.Marshal(reportCollect)
-				if err != nil {
-					slog.Error("add priv", slog.String("err", err.Error()))
-					return err
+				var errMsg []string
+				for _, v := range reportCollect {
+					errMsg = append(errMsg, v...)
 				}
-				return errors.New(string(b))
+				return errno.GrantPrivilegesFail.Add(
+					"\n" +
+						strings.Join(errMsg, "\n") +
+						"\n",
+				)
 			}
 			slog.Info("add priv finish")
 			return nil

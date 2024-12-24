@@ -27,7 +27,7 @@ func (c *MySQLCrondComp) Init() error {
 	if c.Params.NginxAddrs == nil || len(c.Params.NginxAddrs) <= 0 {
 		err := fmt.Errorf("nginx addresses are required")
 		logger.Error(err.Error())
-		return err
+		return nil
 	}
 
 	// 初始化 nginx addrs 配置文件
