@@ -5,11 +5,11 @@ import (
 	"dbm-services/mysql/priv-service/service"
 	"dbm-services/mysql/priv-service/service/v2/internal"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
@@ -79,47 +79,97 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 		}
 	}
 
-	// 接下来可以说都是面对 mysql 实例的授权了
-	// 需要注意的是, TenDBHA 有些时候需要把 client ip 替换成 proxy ip
-	// 所以 TenDBSingle 和 TenDBCluster 的授权语句对于所有 mysql 实例肯定是一样的
-	// TenDBHA 如果申请的是 slave 权限, 也是一样的
-	// TenDBHA 如果申请的是 master 权限, 并且有 padding Proxy, 有一部分是一样的
-	clientIps, workingMySQLInstances := c.prepareMySQLPayload(targetMetaInfos)
-	slog.Info(
-		"add priv",
-		slog.String("clientIps", strings.Join(clientIps, ",")),
-		slog.Any("workingMySQLInstances", workingMySQLInstances),
-	)
+	var errChan = make(chan error, 1)
+	var reportChan = make(chan map[string][]string, 1)
+	var quitChan = make(chan int, 1)
+	go func() {
+		defer func() {
+			quitChan <- 1
+		}()
 
-	// 获取相关的账号规则详情
-	// 这里面就包含了权限明细, dbname, 密码啥的
-	accountAndRuleDetails, err := c.fetchAccountRulesDetail()
-	if err != nil {
-		slog.Error("add priv", slog.String("err", err.Error()))
-		return err
-	}
-	slog.Info(
-		"add priv",
-		slog.String("accountAndRuleDetails", accountAndRuleDetails.String()),
-	)
+		wg := &sync.WaitGroup{}
+		wg.Add(len(targetMetaInfos))
+		bucket := make(chan int, 20)
+		for _, tii := range targetMetaInfos {
+			bucket <- 1
+			go func(tii *service.Instance) {
+				defer func() {
+					<-bucket
+					wg.Done()
+				}()
+				// 接下来可以说都是面对 mysql 实例的授权了
+				// 需要注意的是, TenDBHA 有些时候需要把 client ip 替换成 proxy ip
+				// 所以 TenDBSingle 和 TenDBCluster 的授权语句对于所有 mysql 实例肯定是一样的
+				// TenDBHA 如果申请的是 slave 权限, 也是一样的
+				// TenDBHA 如果申请的是 master 权限, 并且有 padding Proxy, 有一部分是一样的
+				clientIps, workingMySQLInstances := c.prepareMySQLPayload(tii)
+				slog.Info(
+					"add priv",
+					slog.String("clientIps", strings.Join(clientIps, ",")),
+					slog.Any("workingMySQLInstances", workingMySQLInstances),
+				)
 
-	// err 是调用函数出错, 直接报错返回
-	// reports 是实施授权的报告
-	reports, err := c.addOnMySQL(clientIps, workingMySQLInstances, accountAndRuleDetails)
-	if err != nil {
-		slog.Error("add priv", slog.String("err", err.Error()))
-		return err
-	}
-	if len(reports) > 0 {
-		slog.Info("add priv", slog.Any("reports", reports))
-		b, err := json.Marshal(reports)
-		if err != nil {
-			slog.Error("add priv", slog.String("err", err.Error()), slog.String("reports", string(b)))
-			return err
+				// 获取相关的账号规则详情
+				// 这里面就包含了权限明细, dbname, 密码啥的
+				accountAndRuleDetails, err := c.fetchAccountRulesDetail()
+				if err != nil {
+					slog.Error("add priv", slog.String("err", err.Error()))
+					errChan <- err
+				}
+				slog.Info(
+					"add priv",
+					slog.String("accountAndRuleDetails", accountAndRuleDetails.String()),
+				)
+
+				// err 是调用函数出错, 直接报错返回
+				// reports 是实施授权的报告
+				reports, err := c.addOnMySQL(clientIps, workingMySQLInstances, accountAndRuleDetails)
+				if err != nil {
+					slog.Error("add priv", slog.String("err", err.Error()))
+					errChan <- err
+				}
+
+				if len(reports) > 0 {
+					slog.Info("add priv", slog.Any("reports", reports))
+					reportChan <- reports
+				}
+			}(tii)
 		}
-		return errors.New(string(b))
-	}
+		wg.Wait()
+	}()
 
-	slog.Info("add priv finish")
-	return nil
+	var errCollect error
+	var reportCollect map[string][]string
+	for {
+		select {
+		case err := <-errChan:
+			errCollect = errors.Join(errCollect, err)
+		case report := <-reportChan:
+			for k, v := range report {
+				if _, ok := reportCollect[k]; !ok {
+					reportCollect[k] = []string{}
+				}
+
+				reportCollect[k] = append(reportCollect[k], v...)
+			}
+		case <-quitChan:
+			slog.Info("receive quit signal")
+			if errCollect != nil {
+				slog.Error("add priv", slog.String("err", errCollect.Error()))
+				return errCollect
+			}
+
+			if reportCollect != nil {
+				slog.Error("add priv", slog.Any("reportCollect", reportCollect))
+				b, err := json.Marshal(reportCollect)
+				if err != nil {
+					slog.Error("add priv", slog.String("err", err.Error()))
+					return err
+				}
+				return errors.New(string(b))
+			}
+			slog.Info("add priv finish")
+			return nil
+		}
+	}
 }

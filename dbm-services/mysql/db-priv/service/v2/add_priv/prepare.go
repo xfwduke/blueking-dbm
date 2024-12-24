@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func (c *PrivTaskPara) prepareMySQLPayload(targetMetaInfos []*service.Instance) (
+func (c *PrivTaskPara) prepareMySQLPayload(targetMetaInfos ...*service.Instance) (
 	clientIps []string,
 	workingMySQLInstances map[int64][]string) {
 	slog.Info(
