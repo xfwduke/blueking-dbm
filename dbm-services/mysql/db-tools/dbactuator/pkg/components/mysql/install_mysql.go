@@ -901,6 +901,26 @@ func (i *InstallMySQLComp) InitDefaultPrivAndSchemaWithResetMaster() (err error)
 		initSQLs = append(initSQLs, staticembed.SpiderInitSQL)
 	}
 
+	if bsql, err = staticembed.ProcedureSQL.ReadFile(staticembed.GrantProcedureSQLFileName); err != nil {
+		logger.Error("读取存储过程嵌入文件%s失败", staticembed.ProcedureSQL)
+		return err
+	}
+	logger.Info("read embed procedure sql success: %s", bsql)
+
+	for _, value := range strings.SplitAfterN(string(bsql), `#`, -1) {
+		if !regexp.MustCompile(`^\\s*$`).MatchString(value) {
+			initSQLs = append(initSQLs, value)
+		}
+	}
+	// 剔除最后一个空字符，splits 会多分割出一个空字符
+	if len(initSQLs) < 2 {
+		return fmt.Errorf("初始化sql为空%v", initSQLs)
+	}
+
+	if i.Params.GetPkgTypeName() == cst.PkgTypeTdbctl {
+		initSQLs = append(initSQLs, staticembed.SpiderInitSQL)
+	}
+
 	// 调用 mysql-monitor 里的主从复制延迟检查心跳表, infodba_schema.master_slave_heartbeat
 	initSQLs = append(initSQLs, masterslaveheartbeat.DropTableSQL, masterslaveheartbeat.CreateTableSQL)
 	if i.Params.GetPkgTypeName() == cst.PkgTypeMysql { // 避免迁移实例时，新机器还没有这个表，会同步失败

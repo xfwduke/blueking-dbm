@@ -29,6 +29,7 @@ from backend.db_meta.enums import AccessLayer, InstanceInnerRole, MachineType
 from backend.db_meta.exceptions import DBMetaException
 from backend.db_meta.models import Cluster, Machine, ProxyInstance, StorageInstance, StorageInstanceTuple
 from backend.db_package.models import Package
+from backend.db_proxy.reverse_api.common.impl import list_nginx_addrs
 from backend.db_services.mysql.sql_import.constants import BKREPO_DBCONSOLE_DUMPFILE_PATH, BKREPO_SQLFILE_PATH
 from backend.flow.consts import (
     CHECKSUM_DB,
@@ -1582,6 +1583,7 @@ class MysqlActPayload(PayloadHandler, ProxyActPayload, TBinlogDumperActPayload):
                     "beat_path": env.MYSQL_CROND_BEAT_PATH,
                     "agent_address": env.MYSQL_CROND_AGENT_ADDRESS,
                     "bk_biz_id": int(self.ticket_data["bk_biz_id"]),
+                    "nginx_addrs": list_nginx_addrs(bk_cloud_id=self.bk_cloud_id),
                 },
             },
         }
