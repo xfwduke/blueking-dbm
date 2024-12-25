@@ -2,7 +2,7 @@ package webconsole_rpc
 
 import (
 	"dbm-services/mysql/db-remote-service/pkg/config"
-	"dbm-services/mysql/db-remote-service/pkg/mysql_rpc"
+	"dbm-services/mysql/db-remote-service/pkg/rpc_implement/mysql_rpc"
 )
 
 type WebConsoleRPC struct {

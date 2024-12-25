@@ -10,6 +10,8 @@ import (
 func RegisterRouter(engine *gin.Engine) {
 	mysqlGroup := engine.Group("/mysql")
 	mysqlGroup.POST("/rpc", handler_rpc.MySQLRPCHandler)
+	// 复杂接口的设计和其他的都不一样, 所以只能直接添加 handler, 不太好复用 rpc interface
+	mysqlGroup.POST("/complex-rpc", handler_rpc.MySQLComplexHandler)
 
 	proxyGroup := engine.Group("/proxy-admin")
 	proxyGroup.POST("/rpc", handler_rpc.ProxyRPCHandler)

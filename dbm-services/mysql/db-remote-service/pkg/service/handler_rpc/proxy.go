@@ -1,7 +1,7 @@
 package handler_rpc
 
 import (
-	"dbm-services/mysql/db-remote-service/pkg/proxy_rpc"
+	"dbm-services/mysql/db-remote-service/pkg/rpc_implement/proxy_rpc"
 )
 
 // ProxyRPCHandler proxy 请求响应

@@ -1,5 +1,5 @@
 // Package parser sql解析
-package parser
+package rpc_core
 
 // ParseQueryBase query result base field
 type ParseQueryBase struct {

@@ -12,7 +12,7 @@ package mysql_rpc
 
 import (
 	"dbm-services/mysql/db-remote-service/pkg/config"
-	"dbm-services/mysql/db-remote-service/pkg/parser"
+	"dbm-services/mysql/db-remote-service/pkg/rpc_core"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -92,8 +92,8 @@ func (c *MySQLRPCEmbed) MakeConnection(address string, user string, password str
 }
 
 // ParseCommand mysql 解析命令
-func (c *MySQLRPCEmbed) ParseCommand(command string) (*parser.ParseQueryBase, error) {
-	return &parser.ParseQueryBase{
+func (c *MySQLRPCEmbed) ParseCommand(command string) (*rpc_core.ParseQueryBase, error) {
+	return &rpc_core.ParseQueryBase{
 		QueryId:   0,
 		Command:   command,
 		ErrorCode: 0,
@@ -102,12 +102,12 @@ func (c *MySQLRPCEmbed) ParseCommand(command string) (*parser.ParseQueryBase, er
 }
 
 // IsQueryCommand mysql 解析命令
-func (c *MySQLRPCEmbed) IsQueryCommand(pc *parser.ParseQueryBase) bool {
+func (c *MySQLRPCEmbed) IsQueryCommand(pc *rpc_core.ParseQueryBase) bool {
 	return isQueryCommand(pc.Command)
 }
 
 // IsExecuteCommand mysql 解析命令
-func (c *MySQLRPCEmbed) IsExecuteCommand(pc *parser.ParseQueryBase) bool {
+func (c *MySQLRPCEmbed) IsExecuteCommand(pc *rpc_core.ParseQueryBase) bool {
 	return !isQueryCommand(pc.Command)
 }
 

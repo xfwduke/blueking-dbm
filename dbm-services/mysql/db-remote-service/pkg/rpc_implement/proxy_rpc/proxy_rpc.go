@@ -3,7 +3,7 @@ package proxy_rpc
 
 import (
 	"dbm-services/mysql/db-remote-service/pkg/config"
-	"dbm-services/mysql/db-remote-service/pkg/parser"
+	"dbm-services/mysql/db-remote-service/pkg/rpc_core"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -27,8 +27,8 @@ type ProxyRPCEmbed struct {
 }
 
 // ParseCommand proxy 解析命令
-func (c *ProxyRPCEmbed) ParseCommand(command string) (*parser.ParseQueryBase, error) {
-	return &parser.ParseQueryBase{
+func (c *ProxyRPCEmbed) ParseCommand(command string) (*rpc_core.ParseQueryBase, error) {
+	return &rpc_core.ParseQueryBase{
 		QueryId:   0,
 		Command:   command,
 		ErrorCode: 0,
@@ -73,7 +73,7 @@ func (c *ProxyRPCEmbed) MakeConnection(address string, user string, password str
 }
 
 // IsQueryCommand proxy 解析命令
-func (c *ProxyRPCEmbed) IsQueryCommand(pc *parser.ParseQueryBase) bool {
+func (c *ProxyRPCEmbed) IsQueryCommand(pc *rpc_core.ParseQueryBase) bool {
 	for _, ele := range proxyQueryParseCommands {
 		if strings.HasPrefix(strings.ToLower(pc.Command), ele) {
 			return true
@@ -84,7 +84,7 @@ func (c *ProxyRPCEmbed) IsQueryCommand(pc *parser.ParseQueryBase) bool {
 }
 
 // IsExecuteCommand proxy 解析命令
-func (c *ProxyRPCEmbed) IsExecuteCommand(pc *parser.ParseQueryBase) bool {
+func (c *ProxyRPCEmbed) IsExecuteCommand(pc *rpc_core.ParseQueryBase) bool {
 	for _, ele := range proxyExecuteParseCommands {
 		if strings.HasPrefix(strings.ToLower(pc.Command), ele) {
 			return true

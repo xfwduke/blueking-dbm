@@ -1,7 +1,7 @@
 package handler_rpc
 
 import (
-	"dbm-services/mysql/db-remote-service/pkg/sqlserver_rpc"
+	"dbm-services/mysql/db-remote-service/pkg/rpc_implement/sqlserver_rpc"
 )
 
 // SqlserverRPCHandler TODO

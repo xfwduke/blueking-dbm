@@ -8,8 +8,8 @@ import (
 )
 
 // Run 执行
-func (c *RPCWrapper) Run() (res []oneAddressResult) {
-	addrResChan := make(chan oneAddressResult)
+func (c *RPCWrapper) Run() (res []OneAddressResultType) {
+	addrResChan := make(chan OneAddressResultType)
 	tokenBulkChan := make(chan struct{}, config.RuntimeConfig.Concurrent)
 	slog.Debug("init bulk chan", slog.Int("concurrent", config.RuntimeConfig.Concurrent))
 
@@ -27,7 +27,7 @@ func (c *RPCWrapper) Run() (res []oneAddressResult) {
 				if err != nil {
 					errMsg = err.Error()
 				}
-				addrResChan <- oneAddressResult{
+				addrResChan <- OneAddressResultType{
 					Address:    address,
 					CmdResults: addrRes,
 					ErrorMsg:   errMsg,

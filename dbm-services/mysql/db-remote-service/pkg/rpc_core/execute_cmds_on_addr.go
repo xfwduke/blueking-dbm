@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (c *RPCWrapper) executeOneAddr(address string) (res []cmdResult, err error) {
+func (c *RPCWrapper) executeOneAddr(address string) (res []CmdResultType, err error) {
 	db, err := c.MakeConnection(address, c.user, c.password, c.connectTimeout, c.timezone)
 
 	if err != nil {
@@ -48,7 +48,7 @@ func (c *RPCWrapper) executeOneAddr(address string) (res []cmdResult, err error)
 					slog.String("address", address), slog.String("command", command),
 				)
 				res = append(
-					res, cmdResult{
+					res, CmdResultType{
 						Cmd:          command,
 						RowsAffected: 0,
 						TableData:    nil,
@@ -61,7 +61,7 @@ func (c *RPCWrapper) executeOneAddr(address string) (res []cmdResult, err error)
 				continue
 			}
 			res = append(
-				res, cmdResult{
+				res, CmdResultType{
 					Cmd:          command,
 					TableData:    tableData,
 					RowsAffected: 0,
@@ -77,7 +77,7 @@ func (c *RPCWrapper) executeOneAddr(address string) (res []cmdResult, err error)
 					slog.String("address", address), slog.String("command", command),
 				)
 				res = append(
-					res, cmdResult{
+					res, CmdResultType{
 						Cmd:          command,
 						TableData:    nil,
 						RowsAffected: 0,
@@ -90,7 +90,7 @@ func (c *RPCWrapper) executeOneAddr(address string) (res []cmdResult, err error)
 				continue
 			}
 			res = append(
-				res, cmdResult{
+				res, CmdResultType{
 					Cmd:          command,
 					TableData:    nil,
 					RowsAffected: rowsAffected,
@@ -101,7 +101,7 @@ func (c *RPCWrapper) executeOneAddr(address string) (res []cmdResult, err error)
 			err = errors.Errorf("commands[%d]: %s not support", idx, command)
 			slog.Error("dispatch command", slog.String("error", err.Error()))
 			res = append(
-				res, cmdResult{Cmd: command, TableData: nil, RowsAffected: 0, ErrorMsg: err.Error()},
+				res, CmdResultType{Cmd: command, TableData: nil, RowsAffected: 0, ErrorMsg: err.Error()},
 			)
 			if !c.force {
 				return res, err

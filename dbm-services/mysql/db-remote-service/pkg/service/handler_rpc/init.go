@@ -15,6 +15,7 @@ type queryRequest struct {
 
 // TrimSpace delete space around address
 func (r *queryRequest) TrimSpace() {
+	r.Timezone = strings.TrimSpace(r.Timezone)
 	for idx, val := range r.Addresses {
 		r.Addresses[idx] = strings.TrimSpace(val)
 	}

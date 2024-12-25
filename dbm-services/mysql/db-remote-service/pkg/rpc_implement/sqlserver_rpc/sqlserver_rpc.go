@@ -2,13 +2,13 @@ package sqlserver_rpc
 
 import (
 	"context"
+	"dbm-services/mysql/db-remote-service/pkg/rpc_core"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"dbm-services/mysql/db-remote-service/pkg/config"
-	"dbm-services/mysql/db-remote-service/pkg/parser"
 
 	_ "github.com/denisenkom/go-mssqldb" // go-mssqldb TODO
 	"github.com/jmoiron/sqlx"
@@ -39,8 +39,8 @@ type SqlserverRPCEmbed struct {
 }
 
 // ParseCommand sqlserver 解析命令
-func (c *SqlserverRPCEmbed) ParseCommand(command string) (*parser.ParseQueryBase, error) {
-	return &parser.ParseQueryBase{
+func (c *SqlserverRPCEmbed) ParseCommand(command string) (*rpc_core.ParseQueryBase, error) {
+	return &rpc_core.ParseQueryBase{
 		QueryId:   0,
 		Command:   command,
 		ErrorCode: 0,
@@ -76,7 +76,7 @@ func (c *SqlserverRPCEmbed) MakeConnection(address string, user string, password
 }
 
 // IsQueryCommand sqlserver 解析命令
-func (c *SqlserverRPCEmbed) IsQueryCommand(pc *parser.ParseQueryBase) bool {
+func (c *SqlserverRPCEmbed) IsQueryCommand(pc *rpc_core.ParseQueryBase) bool {
 	for _, ele := range sqlserverQueryParseCommands {
 		if strings.HasPrefix(strings.ToLower(pc.Command), ele) {
 			return true
@@ -87,7 +87,7 @@ func (c *SqlserverRPCEmbed) IsQueryCommand(pc *parser.ParseQueryBase) bool {
 }
 
 // IsExecuteCommand sqlserver 解析命令
-func (c *SqlserverRPCEmbed) IsExecuteCommand(pc *parser.ParseQueryBase) bool {
+func (c *SqlserverRPCEmbed) IsExecuteCommand(pc *rpc_core.ParseQueryBase) bool {
 	for _, ele := range sqlserverExecuteParseCommands {
 		if strings.HasPrefix(strings.ToLower(pc.Command), ele) {
 			return true

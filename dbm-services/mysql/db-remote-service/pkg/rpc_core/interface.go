@@ -1,8 +1,6 @@
 package rpc_core
 
 import (
-	"dbm-services/mysql/db-remote-service/pkg/parser"
-
 	"github.com/jmoiron/sqlx"
 )
 
@@ -15,9 +13,9 @@ type RPCEmbedInterface interface {
 		timeout int,
 		timezone string,
 	) (*sqlx.DB, error)
-	ParseCommand(command string) (*parser.ParseQueryBase, error)
-	IsQueryCommand(*parser.ParseQueryBase) bool
-	IsExecuteCommand(*parser.ParseQueryBase) bool
+	ParseCommand(command string) (*ParseQueryBase, error)
+	IsQueryCommand(*ParseQueryBase) bool
+	IsExecuteCommand(*ParseQueryBase) bool
 	User() string
 	Password() string
 }
