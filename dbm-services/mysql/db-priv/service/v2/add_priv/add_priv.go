@@ -36,6 +36,21 @@ func (c *PrivTaskPara) AddPriv(jsonPara, ticket string) (err error) {
 	if c.ClusterType == "" {
 		return errno.ClusterTypeIsEmpty
 	}
+	if c.SourceIPs == nil || len(c.SourceIPs) == 0 {
+		return errno.GrantPrivilegesParameterCheckFail
+	}
+	if c.TargetInstances == nil || len(c.TargetInstances) == 0 {
+		return errno.GrantPrivilegesParameterCheckFail
+	}
+	if c.AccoutRules == nil || len(c.AccoutRules) == 0 {
+		return errno.GrantPrivilegesParameterCheckFail
+	}
+	if c.User == "" {
+		return errno.GrantPrivilegesParameterCheckFail
+	}
+	if c.ClusterType == "" {
+		return errno.GrantPrivilegesParameterCheckFail
+	}
 
 	c.SourceIPs = internal.UniqueStringSlice(c.SourceIPs)
 	// targetInstance 传入的其实全是域名
