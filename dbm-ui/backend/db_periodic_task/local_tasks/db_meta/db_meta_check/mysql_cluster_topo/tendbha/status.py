@@ -11,7 +11,7 @@ specific language governing permissions and limitations under the License.
 
 from typing import List
 
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from backend.db_meta.enums import ClusterEntryRole, ClusterStatus, InstanceInnerRole, InstancePhase, InstanceStatus
 from backend.db_meta.models import Cluster
@@ -153,9 +153,7 @@ def _cluster_one_standby_slave(
 
 
 @checker_wrapper
-def _cluster_standby_slave_status(
-    c: Cluster,
-) -> List[CheckResponse]:
+def _cluster_standby_slave_status(c: Cluster) -> List[CheckResponse]:
     """
     standby slave 必须正常
     """
@@ -164,12 +162,12 @@ def _cluster_standby_slave_status(
         if (si.instance_inner_role == InstanceInnerRole.SLAVE and si.is_stand_by is True) and (
             si.status != InstanceStatus.RUNNING or si.phase != InstancePhase.ONLINE
         ):
-            bad.append(si)
-
-    if bad:
-        return [
-            CheckResponse(
-                msg=_("standby slave 状态异常: {}".format(",".join([ele.ip_port for ele in bad]))),
-                check_subtype=MetaCheckSubType.ClusterTopo,
+            bad.append(
+                CheckResponse(
+                    msg=_("standby slave {} 状态异常: {}, {}".format(si.ip_port, si.status, si.phase)),
+                    check_subtype=MetaCheckSubType.ClusterTopo,
+                    instance=si,
+                )
             )
-        ]
+
+    return bad
