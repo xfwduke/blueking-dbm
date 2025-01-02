@@ -268,3 +268,12 @@
   - spider
   role:
   - spider_master
+- name: priv-check
+  enable: true
+  schedule: 0 40 9 * * *
+  machine_type:
+  - spider
+  - remote
+  - backend
+  - single
+  role: []

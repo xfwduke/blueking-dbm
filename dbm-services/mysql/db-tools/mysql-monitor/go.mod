@@ -3,6 +3,7 @@ module dbm-services/mysql/db-tools/mysql-monitor
 go 1.21
 
 require (
+	github.com/antlr4-go/antlr/v4 v4.13.0
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/go-playground/validator/v10 v10.15.4
 	github.com/go-sql-driver/mysql v1.6.0
@@ -20,6 +21,8 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v2 v2.4.0
 )
+
+require golang.org/x/exp v0.0.0-20230515195305-f3d0a9c9a5cc
 
 require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
