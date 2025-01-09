@@ -41,13 +41,13 @@ func (c *Checker) backupToBackend(users []string) error {
 
 	for _, user := range users {
 		splitUser := strings.Split(user, "@")
-		if len(splitUser) != 2 {
+		if len(splitUser) < 2 {
 			err := fmt.Errorf("invalid user %s", user)
 			slog.Error("backup proxy user list prepare", slog.String("err", err.Error()))
 			return err
 		}
-		username := splitUser[0]
-		host := splitUser[1]
+		username := strings.Join(splitUser[:len(splitUser)-1], "@")
+		host := splitUser[len(splitUser)-1]
 
 		err := writeOne(stmt, username, host, now)
 

@@ -135,15 +135,31 @@ func (m *CloneClientPrivPara) CloneClientPriv(jsonPara string, ticket string) ([
 				wg.Done()
 			}()
 			clusterGrant := ClusterGrantSql{ImmuteDomain: item.ImmuteDomain}
+			slog.Info(
+				"client clone",
+				slog.String("cluster", item.ImmuteDomain),
+				slog.String("cluster_type", item.ClusterType),
+			)
+
 			if item.ClusterType == tendbha || item.ClusterType == tendbsingle {
 				for _, storage := range item.Storages {
 					address := fmt.Sprintf("%s:%d", storage.IP, storage.Port)
+					slog.Info("client clone",
+						slog.String("address", address),
+						slog.String("cluster", item.ImmuteDomain),
+					)
+
 					// 在后端mysql中获取匹配的user@host列表
 					_, _, matchHosts, err := MysqlUserList(address, item.BkCloudId, []string{m.SourceIp}, nil, "")
 					if err != nil {
 						AddError(&errMsg, address, err)
 						continue
 					}
+					slog.Info("client clone",
+						slog.Any("matchHosts", matchHosts),
+						slog.String("cluster", item.ImmuteDomain),
+					)
+
 					if len(matchHosts) == 0 {
 						slog.Info("no match user@host", "instance", address,
 							"source ip", m.SourceIp)
@@ -156,12 +172,22 @@ func (m *CloneClientPrivPara) CloneClientPriv(jsonPara string, ticket string) ([
 						AddError(&errMsg, address, err)
 						continue
 					}
+					slog.Info("client clone",
+						slog.Any("userGrants", userGrants),
+						slog.String("cluster", item.ImmuteDomain),
+					)
+
 					if len(userGrants) == 0 {
 						slog.Info("no match user@host", "instance", address,
 							"source ip", m.SourceIp, "user", m.User)
 						continue
 					}
 					userGrants = ReplaceHostInMysqlGrants(userGrants, m.TargetIp)
+					slog.Info("client clone",
+						slog.Any("replaced userGrants", userGrants),
+						slog.String("cluster", item.ImmuteDomain),
+					)
+
 					var grants []string
 					for _, sql := range userGrants {
 						grants = append(grants, sql.Grants...)
@@ -181,6 +207,11 @@ func (m *CloneClientPrivPara) CloneClientPriv(jsonPara string, ticket string) ([
 						AddError(&errMsg, address, err)
 						continue
 					}
+					slog.Info("client clone",
+						slog.Any("matchHosts", matchHosts),
+						slog.String("cluster", item.ImmuteDomain),
+					)
+
 					if len(matchHosts) == 0 {
 						slog.Info("no match user@host", "instance", address,
 							"source ip", m.SourceIp)
@@ -192,12 +223,22 @@ func (m *CloneClientPrivPara) CloneClientPriv(jsonPara string, ticket string) ([
 						AddError(&errMsg, address, err)
 						continue
 					}
+					slog.Info("client clone",
+						slog.Any("userGrants", userGrants),
+						slog.String("cluster", item.ImmuteDomain),
+					)
+
 					if len(userGrants) == 0 {
 						slog.Info("no match user@host", "instance", address,
 							"source ip", m.SourceIp, "user", m.User)
 						continue
 					}
 					userGrants = ReplaceHostInMysqlGrants(userGrants, m.TargetIp)
+					slog.Info("client clone",
+						slog.Any("replaced userGrants", userGrants),
+						slog.String("cluster", item.ImmuteDomain),
+					)
+
 					var grants []string
 					for _, sql := range userGrants {
 						grants = append(grants, sql.Grants...)
@@ -211,14 +252,26 @@ func (m *CloneClientPrivPara) CloneClientPriv(jsonPara string, ticket string) ([
 				}
 			}
 			if item.ClusterType == tendbha {
+				slog.Info("proxy client clone", slog.String("cluster", item.ImmuteDomain))
 				for _, proxy := range item.Proxies {
 					address := fmt.Sprintf("%s:%d", proxy.IP, proxy.AdminPort)
+					slog.Info(
+						"proxy client clone",
+						slog.String("cluster", item.ImmuteDomain),
+						slog.String("address", address),
+					)
+
 					_, _, matchHosts, err := ProxyWhiteList(address, item.BkCloudId, []string{m.SourceIp}, nil, "")
 					if err != nil {
 						slog.Error("msg", "ProxyWhiteList", err)
 						AddError(&errMsg, address, err)
 					}
-					slog.Info("msg", "matchHosts", matchHosts)
+					slog.Info(
+						"proxy client clone",
+						slog.String("cluster", item.ImmuteDomain),
+						slog.Any("matchHosts", matchHosts),
+					)
+
 					if len(matchHosts) == 0 {
 						slog.Info("no match user@host", "instance", address,
 							"source ip", m.SourceIp)
@@ -229,11 +282,22 @@ func (m *CloneClientPrivPara) CloneClientPriv(jsonPara string, ticket string) ([
 						slog.Error("msg", "GetProxyPrivilege", err)
 						AddError(&errMsg, address, err)
 					}
+					slog.Info(
+						"proxy client clone",
+						slog.String("cluster", item.ImmuteDomain),
+						slog.Any("proxyUsers", proxyUsers),
+					)
+
 					if len(proxyUsers) == 0 {
 						slog.Info("no match user@host", "instance", address, "user", m.User)
 						continue
 					}
 					proxyUsers = ReplaceHostInProxyGrants(proxyUsers, m.TargetIp)
+					slog.Info(
+						"proxy client clone",
+						slog.String("cluster", item.ImmuteDomain),
+						slog.Any("replaced proxyUsers", proxyUsers),
+					)
 
 					var oneBuckUsers []string
 					for _, u := range proxyUsers {
@@ -245,6 +309,11 @@ func (m *CloneClientPrivPara) CloneClientPriv(jsonPara string, ticket string) ([
 							)
 							clusterGrant.Sqls = append(clusterGrant.Sqls,
 								InstanceGrantSql{address, []string{refreshSql}},
+							)
+							slog.Info(
+								"proxy client clone",
+								slog.String("cluster", item.ImmuteDomain),
+								slog.String("refresh sql", refreshSql),
 							)
 							err = ImportProxyPrivileges(
 								[]string{refreshSql},
@@ -258,6 +327,11 @@ func (m *CloneClientPrivPara) CloneClientPriv(jsonPara string, ticket string) ([
 					refreshSql := fmt.Sprintf(
 						"refresh_users('%s', '+')",
 						strings.Join(oneBuckUsers, ","),
+					)
+					slog.Info(
+						"proxy client clone",
+						slog.String("cluster", item.ImmuteDomain),
+						slog.String("refresh sql", refreshSql),
 					)
 					clusterGrant.Sqls = append(clusterGrant.Sqls,
 						InstanceGrantSql{address, []string{refreshSql}},

@@ -678,11 +678,17 @@ class MysqlActPayload(PayloadHandler, ProxyActPayload, TBinlogDumperActPayload):
             role = ins_list[0].instance_inner_role
             # tendbcluster remote 补充shard信息
             if machine.machine_type == MachineType.REMOTE.value:
+                # 故障场景可能有 tp 对象没有对应的 set 记录
                 for ins in ins_list:
                     if ins.instance_inner_role == InstanceInnerRole.MASTER.value:
-                        tp = StorageInstanceTuple.objects.filter(ejector=ins).first()
+                        tp = StorageInstanceTuple.objects.filter(
+                            ejector=ins, tendbclusterstorageset__shard_id__isnull=False
+                        ).first()
                     else:
-                        tp = StorageInstanceTuple.objects.get(receiver=ins)
+                        tp = StorageInstanceTuple.objects.get(
+                            receiver=ins, tendbclusterstorageset__shard_id__isnull=False
+                        )
+
                     shard_port_map[ins.port] = tp.tendbclusterstorageset.shard_id
         else:
             raise DBMetaException(message=_("不支持的机器类型: {}".format(machine.machine_type)))

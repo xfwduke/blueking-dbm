@@ -53,12 +53,14 @@ func ReplaceHostInMysqlGrants(userGrants []UserGrant, targetIp []string) []UserG
 // ReplaceHostInProxyGrants 替换proxy新增白名单语句中的host
 func ReplaceHostInProxyGrants(grants []string, targetIp []string) []string {
 	var newGrants []string
-	var grantTmp string
-	re := regexp.MustCompile("(?U)@.*'")
+	//var grantTmp string
+	//re := regexp.MustCompile("(?U)@.*'")
 	for _, item := range grants {
+		splitUser := strings.Split(item, "@")
+		username := strings.Join(splitUser[:len(splitUser)-1], "@")
+
 		for _, ip := range targetIp {
-			grantTmp = re.ReplaceAllString(item, fmt.Sprintf("@%s'", ip))
-			newGrants = append(newGrants, grantTmp)
+			newGrants = append(newGrants, fmt.Sprintf("%s@%s", username, ip))
 		}
 	}
 	return newGrants
