@@ -33,6 +33,10 @@ func (c *PrivTaskPara) prepareTenDBSingle(targetMetaInfos []*service.Instance) (
 
 	for _, ele := range targetMetaInfos {
 		for _, s := range ele.Storages {
+			if s.Status != internal.InstanceStatusRunning {
+				slog.Info("prepare ignore", slog.String("ip", s.IP), slog.Int64("port", s.Port))
+				continue
+			}
 			if _, ok := workingMySQLInstances[ele.BkCloudId]; !ok {
 				workingMySQLInstances[ele.BkCloudId] = make([]string, 0)
 			}
@@ -54,6 +58,10 @@ func (c *PrivTaskPara) prepareTenDBHA(targetMetaInfos []*service.Instance) (
 	for _, ele := range targetMetaInfos {
 		var proxyIps []string
 		for _, p := range ele.Proxies {
+			if p.Status != internal.InstanceStatusRunning {
+				slog.Info("prepare ignore", slog.String("ip", p.IP), slog.Int64("port", p.Port))
+				continue
+			}
 			proxyIps = append(proxyIps, p.IP)
 		}
 
@@ -76,6 +84,10 @@ func (c *PrivTaskPara) prepareTenDBHA(targetMetaInfos []*service.Instance) (
 		slog.Info("prepare tendbha", slog.String("clientIps", strings.Join(clientIps, ",")))
 		// TenDBHA 要在所有存储实例执行授权
 		for _, s := range ele.Storages {
+			if s.Status != internal.InstanceStatusRunning {
+				slog.Info("prepare ignore", slog.String("ip", s.IP), slog.Int64("port", s.Port))
+				continue
+			}
 			if _, ok := workingMySQLInstances[ele.BkCloudId]; !ok {
 				workingMySQLInstances[ele.BkCloudId] = make([]string, 0)
 			}
@@ -98,6 +110,10 @@ func (c *PrivTaskPara) prepareTenDBCluster(targetMetaInfos []*service.Instance) 
 	for _, ele := range targetMetaInfos {
 		if ele.EntryRole == internal.EntryRoleMasterEntry {
 			for _, s := range ele.SpiderMaster {
+				if s.Status != internal.InstanceStatusRunning {
+					slog.Info("prepare ignore", slog.String("ip", s.IP), slog.Int64("port", s.Port))
+					continue
+				}
 				if _, ok := workingMySQLInstances[ele.BkCloudId]; !ok {
 					workingMySQLInstances[ele.BkCloudId] = make([]string, 0)
 				}
@@ -108,6 +124,10 @@ func (c *PrivTaskPara) prepareTenDBCluster(targetMetaInfos []*service.Instance) 
 			}
 		} else {
 			for _, s := range ele.SpiderSlave {
+				if s.Status != internal.InstanceStatusRunning {
+					slog.Info("prepare ignore", slog.String("ip", s.IP), slog.Int64("port", s.Port))
+					continue
+				}
 				if _, ok := workingMySQLInstances[ele.BkCloudId]; !ok {
 					workingMySQLInstances[ele.BkCloudId] = make([]string, 0)
 				}
