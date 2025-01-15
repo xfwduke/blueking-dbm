@@ -100,8 +100,11 @@ CREATE PROCEDURE infodba_schema.check_all(
 SQL SECURITY INVOKER
 BEGIN
     -- 全量检查入口
-    CALL check_password(uuid, grant_time, username, ip_list, long_psw, short_psw, is_check_failed);
-    CALL check_db_conflict(uuid, grant_time, username, ip_list, db_list, is_check_failed);
+    SET @password_check = 0;
+    SET @db_check = 0;
+    CALL check_password(uuid, grant_time, username, ip_list, long_psw, short_psw, @password_check);
+    CALL check_db_conflict(uuid, grant_time, username, ip_list, db_list, @db_check);
+    SET is_check_failed = @password_check OR @db_check;
 END #
 
 
