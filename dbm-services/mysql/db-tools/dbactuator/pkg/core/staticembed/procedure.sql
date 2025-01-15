@@ -100,11 +100,8 @@ CREATE PROCEDURE infodba_schema.check_all(
 SQL SECURITY INVOKER
 BEGIN
     -- 全量检查入口
-    SET @password_check = 0;
-    SET @db_check = 0;
-    CALL check_password(uuid, grant_time, username, ip_list, long_psw, short_psw, @password_check);
-    CALL check_db_conflict(uuid, grant_time, username, ip_list, db_list, @db_check);
-    SET is_check_failed = @password_check OR @db_check;
+    CALL check_password(uuid, grant_time, username, ip_list, long_psw, short_psw, is_check_failed);
+    CALL check_db_conflict(uuid, grant_time, username, ip_list, db_list, is_check_failed);
 END #
 
 
@@ -133,14 +130,23 @@ BEGIN
         IF @user_host_exists THEN
             -- 用户存在, 检查密码
             -- 5.6 及之前还有 old_password 函数, 也就是 < 5.7 可能有 old_password
-            IF SUBSTRING_INDEX(@@version, ".", 2) < 5.7 THEN
-                SELECT password = long_psw OR password = short_psw INTO @psw_match FROM mysql.user WHERE user = username AND host = @ip;
+            IF @@version LIKE '%tspider%' THEN
+                IF @@VERSION LIKE "%tspider-1%" OR @@VERSION LIKE "%tspider-2%" OR @@VERSION LIKE "%tspider-3%" OR @@VERSION LIKE "%tspider-4%" THEN
+                    SELECT password = long_psw OR password = short_psw INTO @psw_match FROM mysql.user WHERE user = username AND host = @ip;
+                ELSE
+                    SET @msg = CONCAT('not support spider version: ', @@version);
+                    SIGNAL SQLSTATE '32401' SET MESSAGE_TEXT = @msg;
+                END IF;
             ELSE
-                SELECT authentication_string = long_psw INTO @psw_match FROM mysql.user WHERE user = username AND host =@ip;
-            END IF;   
+                IF SUBSTRING_INDEX(@@version, ".", 2) < 5.7 THEN
+                    SELECT password = long_psw OR password = short_psw INTO @psw_match FROM mysql.user WHERE user = username AND host = @ip;
+                ELSE
+                    SELECT authentication_string = long_psw INTO @psw_match FROM mysql.user WHERE user = username AND host =@ip;
+                END IF;
+            END IF;
 
             IF NOT @psw_match THEN
-                SET is_check_failed = is_check_failed OR 1;
+                SET is_check_failed = NOT @psw_match;
                 INSERT INTO dba_grant_result(id, grant_time, username, client_ip, long_psw, short_psw, msg)
                     VALUES (uuid, grant_time, username, @ip, long_psw, short_psw, 'password not match');
             END IF;     
