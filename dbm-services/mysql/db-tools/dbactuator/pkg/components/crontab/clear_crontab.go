@@ -43,7 +43,6 @@ func (u *ClearCrontabParam) CleanCrontab() (err error) {
 	err = cmd.Run()
 	if err != nil {
 		logger.Error("remove mysql-crond keep alive crontab failed: %s", err.Error())
-		return err
 	}
 	logger.Info("remove mysql-crond keep alive crontab success")
 

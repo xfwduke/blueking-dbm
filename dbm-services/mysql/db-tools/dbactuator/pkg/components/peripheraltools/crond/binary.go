@@ -2,13 +2,18 @@ package crond
 
 import (
 	"dbm-services/common/go-pubpkg/logger"
+	"dbm-services/mysql/db-tools/dbactuator/pkg/components"
 	"dbm-services/mysql/db-tools/dbactuator/pkg/core/cst"
 	"dbm-services/mysql/db-tools/dbactuator/pkg/util/osutil"
 	"fmt"
 	"os"
 )
 
-func (c *MySQLCrondComp) DeployBinary() (err error) {
+//func (c *MySQLCrondComp) DeployBinary() (err error) {
+//	return DeployBinary(&c.Params.Medium)
+//}
+
+func DeployBinary(medium *components.Medium) (err error) {
 	err = os.MkdirAll(cst.MySQLCrondInstallPath, 0755)
 	if err != nil {
 		logger.Error("mkdir %s failed: %s", cst.MySQLCrondInstallPath, err.Error())
@@ -17,7 +22,7 @@ func (c *MySQLCrondComp) DeployBinary() (err error) {
 
 	decompressCmd := fmt.Sprintf(
 		`tar zxf %s -C %s`,
-		c.Params.Medium.GetAbsolutePath(), cst.MySQLCrondInstallPath,
+		medium.GetAbsolutePath(), cst.MySQLCrondInstallPath,
 	)
 	_, err = osutil.ExecShellCommand(false, decompressCmd)
 	if err != nil {

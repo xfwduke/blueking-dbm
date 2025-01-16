@@ -2,6 +2,7 @@ package checksum
 
 import (
 	"dbm-services/common/go-pubpkg/logger"
+	"dbm-services/mysql/db-tools/dbactuator/pkg/components"
 	"dbm-services/mysql/db-tools/dbactuator/pkg/core/cst"
 	"dbm-services/mysql/db-tools/dbactuator/pkg/util/osutil"
 	"fmt"
@@ -9,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-func (c *MySQLChecksumComp) DeployBinary() (err error) {
+func DeployBinary(medium *components.Medium) (err error) {
 	err = os.MkdirAll(cst.ChecksumInstallPath, 0755)
 	if err != nil {
 		logger.Error("mkdir %s failed: %s", cst.ChecksumInstallPath, err.Error())
@@ -18,7 +19,7 @@ func (c *MySQLChecksumComp) DeployBinary() (err error) {
 
 	decompressCmd := fmt.Sprintf(
 		`tar zxf %s -C %s`,
-		c.Params.Medium.GetAbsolutePath(), cst.ChecksumInstallPath,
+		medium.GetAbsolutePath(), cst.ChecksumInstallPath,
 	)
 	_, err = osutil.ExecShellCommand(false, decompressCmd)
 	if err != nil {

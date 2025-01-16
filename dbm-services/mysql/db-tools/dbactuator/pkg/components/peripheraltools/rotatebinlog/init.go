@@ -23,23 +23,43 @@ type MySQLRotateBinlogComp struct {
 }
 
 type MySQLRotateBinlogParam struct {
-	components.Medium
-	Configs   rotate.Config       `json:"configs" validate:"required"`
-	Instances []*rotate.ServerObj `json:"instances"`
-	ExecUser  string              `json:"exec_user"`
+	Configs       rotate.Config `json:"configs" validate:"required"`
+	IP            string        `json:"ip"`
+	Ports         []int         `json:"port_list"`
+	Role          string        `json:"role"`
+	BkBizId       int           `json:"bk_biz_id"`
+	ClusterDomain string        `json:"cluster_domain"`
+	ClusterId     int           `json:"cluster_id"`
+	ExecUser      string        `json:"exec_user"`
 }
 
 func (c *MySQLRotateBinlogComp) Init() (err error) {
-	c.Params.Configs.Servers = c.Params.Instances
-	for _, s := range c.Params.Configs.Servers {
-		s.Username = c.GeneralParam.RuntimeAccountParam.MonitorUser
-		s.Password = c.GeneralParam.RuntimeAccountParam.MonitorPwd
+	for _, port := range c.Params.Ports {
+		c.Params.Configs.Servers = append(c.Params.Configs.Servers, &rotate.ServerObj{
+			Host:     c.Params.IP,
+			Port:     port,
+			Username: c.GeneralParam.RuntimeAccountParam.MonitorUser,
+			Password: c.GeneralParam.RuntimeAccountParam.MonitorPwd,
+			Socket:   "",
+			Tags: rotate.InstanceMeta{
+				BkBizId:       c.Params.BkBizId,
+				ClusterId:     c.Params.ClusterId,
+				ClusterDomain: c.Params.ClusterDomain,
+				DBRole:        c.Params.Role,
+			},
+		})
+
 		var instObj = native.InsObject{
-			Host: s.Host, Port: s.Port, User: s.Username, Pwd: s.Password, Socket: s.Socket,
+			Host: c.Params.IP, Port: port,
+			User: c.GeneralParam.RuntimeAccountParam.MonitorUser, Pwd: c.GeneralParam.RuntimeAccountParam.MonitorPwd,
+			Socket: "",
 		}
 		if dbw, err := instObj.Conn(); err != nil {
-			logger.Error("install mysql-rotatebinlog test connect failed: %s. instance:%+v", err.Error(), *s)
-			// return err
+			logger.Error(
+				"install mysql-rotatebinlog test connect failed: %s. instance:%s:%d",
+				err.Error(), c.Params.IP, port,
+			)
+
 		} else {
 			dbw.Stop()
 		}
@@ -55,9 +75,5 @@ func (c *MySQLRotateBinlogComp) Init() (err error) {
 }
 
 func (c *MySQLRotateBinlogComp) PreCheck() (err error) {
-	if err = c.Params.Medium.Check(); err != nil {
-		logger.Error("check mysql-rotatebinlog pkg failed: %s", err.Error())
-		return err
-	}
 	return nil
 }

@@ -16,10 +16,10 @@ func (c *MySQLChecksumComp) AddToCrond() (err error) {
 		return err
 	}
 
-	for _, inst := range c.Params.InstancesInfo {
+	for _, port := range c.Params.Ports {
 		configPath := filepath.Join(
 			cst.ChecksumInstallPath,
-			fmt.Sprintf("checksum_%d.yaml", inst.Port),
+			fmt.Sprintf("checksum_%d.yaml", port),
 		)
 
 		err = internal.RegisterCrond(mysqlTableChecksum, configPath, c.Params.ExecUser)
@@ -28,5 +28,6 @@ func (c *MySQLChecksumComp) AddToCrond() (err error) {
 			return err
 		}
 	}
+
 	return nil
 }

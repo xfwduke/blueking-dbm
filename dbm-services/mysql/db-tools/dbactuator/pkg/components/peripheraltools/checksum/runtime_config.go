@@ -5,18 +5,16 @@ import (
 	"path/filepath"
 
 	"dbm-services/common/go-pubpkg/logger"
-	"dbm-services/mysql/db-tools/dbactuator/pkg/components"
 	"dbm-services/mysql/db-tools/dbactuator/pkg/components/peripheraltools/internal"
 	"dbm-services/mysql/db-tools/dbactuator/pkg/core/cst"
-	"dbm-services/mysql/db-tools/dbactuator/pkg/tools"
 
 	"gopkg.in/yaml.v2"
 )
 
 func (c *MySQLChecksumComp) GenerateRuntimeConfig() (err error) {
-	for _, inst := range c.Params.InstancesInfo {
-		logger.Info("generating runtime config on %v", inst)
-		err = generateRuntimeConfigIns(c.Params, inst, &c.GeneralParam.RuntimeAccountParam, c.tools)
+	for _, port := range c.Params.Ports {
+		logger.Info("generating runtime config on %v", port)
+		err = c.generateRuntimeConfigIns(port)
 		if err != nil {
 			return err
 		}
@@ -24,19 +22,21 @@ func (c *MySQLChecksumComp) GenerateRuntimeConfig() (err error) {
 	return nil
 }
 
-func generateRuntimeConfigIns(mcp *MySQLChecksumParam, instance *instanceInfo, rtap *components.RuntimeAccountParam, tl *tools.ToolSet) (err error) {
+func (c *MySQLChecksumComp) generateRuntimeConfigIns(port int) (err error) {
 	logDir := filepath.Join(cst.ChecksumInstallPath, "logs")
 
 	var ignoreDbs []string
-	ignoreDbs = append(ignoreDbs, mcp.SystemDbs...)
-	ignoreDbs = append(ignoreDbs, fmt.Sprintf(`%s%%`, mcp.StageDBHeader))
+	ignoreDbs = append(ignoreDbs, c.Params.SystemDbs...)
+	ignoreDbs = append(ignoreDbs, fmt.Sprintf(`%s%%`, c.Params.StageDBHeader))
 	ignoreDbs = append(ignoreDbs, `bak_%`) // gcs/scr truncate header
-	ignoreDbs = append(ignoreDbs, fmt.Sprintf(`%%%s`, mcp.RollbackDBTail))
+	ignoreDbs = append(ignoreDbs, fmt.Sprintf(`%%%s`, c.Params.RollbackDBTail))
 
 	cfg := NewRuntimeConfig(
-		instance.BkBizId, instance.ClusterId, instance.Port,
-		instance.Role, instance.Schedule, instance.ImmuteDomain, instance.Ip,
-		rtap.MonitorUser, rtap.MonitorPwd, mcp.ApiUrl, logDir, 2, tl)
+		c.Params.BkBizId, c.Params.ClusterId, port,
+		c.Params.Role, c.Params.Schedule, c.Params.ImmuteDomain, c.Params.IP,
+		c.GeneralParam.RuntimeAccountParam.MonitorUser, c.GeneralParam.RuntimeAccountParam.MonitorPwd,
+		c.Params.ApiUrl, logDir, 2, c.tools,
+	)
 	cfg.SetFilter(nil, ignoreDbs, nil, nil)
 
 	b, err := yaml.Marshal(&cfg)
@@ -47,7 +47,7 @@ func generateRuntimeConfigIns(mcp *MySQLChecksumParam, instance *instanceInfo, r
 
 	logger.Info(string(b))
 
-	cfgFilePath := filepath.Join(cst.ChecksumInstallPath, fmt.Sprintf("checksum_%d.yaml", instance.Port))
+	cfgFilePath := filepath.Join(cst.ChecksumInstallPath, fmt.Sprintf("checksum_%d.yaml", port))
 	logger.Info(cfgFilePath)
 
 	return internal.WriteConfig(cfgFilePath, b)

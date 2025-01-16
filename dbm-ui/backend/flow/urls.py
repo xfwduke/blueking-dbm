@@ -265,7 +265,6 @@ from backend.flow.views.tendb_cluster_remote_rebalance import RemoteRebalanceSce
 from backend.flow.views.tendb_cluster_remote_slave_recover import RemoteSlaveRecoverSceneApiView
 from backend.flow.views.tendb_cluster_remote_switch import RemoteSwitchSceneApiView
 from backend.flow.views.tendb_cluster_rollback_data import TendbClusterRollbackDataSceneApiView
-from backend.flow.views.tendb_ha_standardize import TenDBHAStandardizeView
 from backend.flow.views.vm_apply import InstallVmSceneApiView
 from backend.flow.views.vm_destroy import DestroyVmSceneApiView
 from backend.flow.views.vm_disable import DisableVmSceneApiView
@@ -511,7 +510,7 @@ urlpatterns = [
     url("^scene/switch_tbinlogumper$", SwitchTBinlogDumperSceneApiView.as_view()),
     url("^scene/enable_tbinlogumper$", EnableTBinlogDumperSceneApiView.as_view()),
     url("^scene/disable_tbinlogumper$", DisableTBinlogDumperSceneApiView.as_view()),
-    url("^scene/tendbha_standardize$", TenDBHAStandardizeView.as_view()),
+    # url("^scene/tendbha_standardize$", TenDBHAStandardizeView.as_view()),
     url("^scene/mysql_open_area$", MysqlOpenAreaSceneApiView.as_view()),
     # migrate
     url("^scene/append_deploy_ctl$", AppendDeployCTLView.as_view()),

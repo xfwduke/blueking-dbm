@@ -13,10 +13,6 @@ import (
 )
 
 func (c *NewDbBackupComp) AddCrontab() error {
-	if c.Params.UntarOnly {
-		logger.Info("untar_only=true do not need AddCrontab")
-		return nil
-	}
 	if c.Params.ClusterType == cst.TendbCluster {
 		return c.addCrontabSpider()
 	} else {
@@ -27,13 +23,13 @@ func (c *NewDbBackupComp) AddCrontab() error {
 func (c *NewDbBackupComp) addCrontabLegacy() (err error) {
 	crondManager := ma.NewManager("http://127.0.0.1:9999")
 	var jobItem ma.JobDefine
-	logFile := path.Join(c.installPath, "logs/main.log")
+	logFile := path.Join(cst.DbbackupGoInstallPath, "logs/main.log")
 	jobItem = ma.JobDefine{
 		Name:     "dbbackup-schedule",
-		Command:  filepath.Join(c.installPath, "dbbackup_main.sh"),
-		WorkDir:  c.installPath,
+		Command:  filepath.Join(cst.DbbackupGoInstallPath, "dbbackup_main.sh"),
+		WorkDir:  cst.DbbackupGoInstallPath,
 		Args:     []string{">", logFile, "2>&1"},
-		Schedule: c.getInsHostCrontabTime(),
+		Schedule: c.Params.Options.CrontabTime,
 		Creator:  c.Params.ExecUser,
 		Enable:   true,
 	}
@@ -51,10 +47,10 @@ func (c *NewDbBackupComp) addCrontabSpider() (err error) {
 		dbbackupConfFile := fmt.Sprintf("dbbackup.%d.ini", c.Params.Ports[0])
 		jobItem = ma.JobDefine{
 			Name:     "spiderbackup-schedule",
-			Command:  filepath.Join(c.installPath, "dbbackup"),
-			WorkDir:  c.installPath,
+			Command:  filepath.Join(cst.DbbackupGoInstallPath, "dbbackup"),
+			WorkDir:  cst.DbbackupGoInstallPath,
 			Args:     []string{"spiderbackup", "schedule", "--config", dbbackupConfFile},
-			Schedule: c.getInsHostCrontabTime(),
+			Schedule: c.Params.Options.CrontabTime, //c.getInsHostCrontabTime(),
 			Creator:  c.Params.ExecUser,
 			Enable:   true,
 		}
@@ -66,8 +62,8 @@ func (c *NewDbBackupComp) addCrontabSpider() (err error) {
 	if !(c.Params.Role == cst.BackupRoleSpiderMnt || c.Params.Role == cst.BackupRoleSpiderSlave) { // MASTER,SLAVE,REPEATER
 		jobItem = ma.JobDefine{
 			Name:     "spiderbackup-check",
-			Command:  filepath.Join(c.installPath, "dbbackup"),
-			WorkDir:  c.installPath,
+			Command:  filepath.Join(cst.DbbackupGoInstallPath, "dbbackup"),
+			WorkDir:  cst.DbbackupGoInstallPath,
 			Args:     []string{"spiderbackup", "check", "--run"},
 			Schedule: "*/1 * * * *",
 			Creator:  c.Params.ExecUser,
@@ -87,8 +83,8 @@ func (c *NewDbBackupComp) addCrontabOld() (err error) {
 	if err != nil {
 		return fmt.Errorf(`删除原备份crontab任务失败("dbbackup") get an error:%w`, err)
 	}
-	entryShell := path.Join(c.installPath, "dbbackup_main.sh")
-	logfile := path.Join(c.installPath, "dbbackup.log")
+	entryShell := path.Join(cst.DbbackupGoInstallPath, "dbbackup_main.sh")
+	logfile := path.Join(cst.DbbackupGoInstallPath, "dbbackup.log")
 	newCrontab = append(
 		newCrontab,
 		fmt.Sprintf(
@@ -100,19 +96,9 @@ func (c *NewDbBackupComp) addCrontabOld() (err error) {
 		newCrontab,
 		fmt.Sprintf(
 			"%s %s 1>>%s 2>&1\n",
-			c.getInsHostCrontabTime(), entryShell, logfile,
+			c.Params.Options.CrontabTime, entryShell, logfile,
 		),
 	)
 	crontabStr := strings.Join(newCrontab, "\n")
 	return osutil.AddCrontab(crontabStr)
-}
-
-func (c *NewDbBackupComp) getInsHostCrontabTime() string {
-	cronTime := ""
-	for _, opt := range c.Params.Options {
-		if opt.CrontabTime > cronTime {
-			cronTime = opt.CrontabTime
-		}
-	}
-	return cronTime
 }

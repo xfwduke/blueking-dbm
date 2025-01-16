@@ -69,10 +69,6 @@ func (c *PushMySQLMonitorConfigAct) Run() (err error) {
 			Func:    c.Service.GenerateItemsConfig,
 		},
 		{
-			FunName: "生成exporter配置文件",
-			Func:    c.Service.GenerateExporterConfig,
-		},
-		{
 			FunName: "重载配置",
 			Func:    c.Service.AddToCrond,
 		},

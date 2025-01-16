@@ -12,16 +12,11 @@ import (
 )
 
 func (c *NewDbBackupComp) InitRenderData() (err error) {
-	if c.Params.UntarOnly {
-		logger.Info("untar_only=true do not need InitRenderData")
-		return nil
-	}
-
 	bkuser := c.GeneralParam.RuntimeAccountParam.DbBackupUser
 	bkpwd := c.GeneralParam.RuntimeAccountParam.DbBackupPwd
 
 	for _, port := range c.Params.Ports {
-		pf, err := db_table_filter.NewFilter([]string{"*"}, []string{"*"}, c.ignoreDbs[port], c.ignoreTbls[port])
+		pf, err := db_table_filter.NewFilter([]string{"*"}, []string{"*"}, c.ignoreDbs, c.ignoreTbls)
 		if err != nil {
 			return err
 		}
@@ -33,12 +28,12 @@ func (c *NewDbBackupComp) InitRenderData() (err error) {
 		var dsg string
 		switch c.Params.Role {
 		case cst.BackupRoleMaster, cst.BackupRoleRepeater:
-			dsg = c.backupOpt[port].Master.DataSchemaGrant
+			dsg = c.Params.Options.Master.DataSchemaGrant
 		case cst.BackupRoleSlave:
-			dsg = c.backupOpt[port].Slave.DataSchemaGrant
+			dsg = c.Params.Options.Slave.DataSchemaGrant
 		case cst.BackupRoleOrphan:
 			// orphan 使用的是 tendbsingle Master.DataSchemaGrant
-			dsg = c.backupOpt[port].Master.DataSchemaGrant
+			dsg = c.Params.Options.Master.DataSchemaGrant
 		case cst.BackupRoleSpiderMaster, cst.BackupRoleSpiderSlave, cst.BackupRoleSpiderMnt:
 			// spider 只在 spider_master and tdbctl_master 上，备份schema,grant
 			dsg = "schema,grant"
@@ -54,10 +49,10 @@ func (c *NewDbBackupComp) InitRenderData() (err error) {
 				MysqlRole:       strings.ToLower(c.Params.Role),
 				BkBizId:         c.Params.BkBizId,
 				BkCloudId:       c.Params.BkCloudId,
-				ClusterAddress:  c.getInsDomainAddr(port),
-				ClusterId:       c.getInsClusterId(port),
+				ClusterAddress:  c.Params.ImmuteDomain,
+				ClusterId:       c.Params.ClusterId,
 				ShardValue:      c.getInsShardValue(port),
-				BackupType:      c.backupOpt[port].BackupType,
+				BackupType:      c.Params.Options.BackupType,
 				DataSchemaGrant: dsg,
 			},
 			BackupClient: config.BackupClient{},
@@ -84,30 +79,6 @@ func (c *NewDbBackupComp) InitRenderData() (err error) {
 	return nil
 }
 
-func (c *NewDbBackupComp) getInsDomainAddr(port int) string {
-	if c.Params.ClusterAddress == nil {
-		return ""
-	}
-	if len(c.Params.ClusterAddress) == 0 {
-		return ""
-	}
-	if v, ok := c.Params.ClusterAddress[port]; ok {
-		return v
-	}
-	return ""
-}
-func (c *NewDbBackupComp) getInsClusterId(port int) int {
-	if c.Params.ClusterId == nil {
-		return 0
-	}
-	if len(c.Params.ClusterId) == 0 {
-		return 0
-	}
-	if v, ok := c.Params.ClusterId[port]; ok {
-		return v
-	}
-	return 0
-}
 func (c *NewDbBackupComp) getInsShardValue(port int) int {
 	if c.Params.ShardValue == nil {
 		return 0

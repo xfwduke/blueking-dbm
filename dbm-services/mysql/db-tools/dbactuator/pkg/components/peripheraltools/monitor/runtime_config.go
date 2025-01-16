@@ -3,7 +3,6 @@ package monitor
 import (
 	"context"
 	"dbm-services/common/go-pubpkg/logger"
-	"dbm-services/mysql/db-tools/dbactuator/pkg/components"
 	"dbm-services/mysql/db-tools/dbactuator/pkg/components/peripheraltools/internal"
 	"dbm-services/mysql/db-tools/mysql-monitor/pkg/config"
 
@@ -18,14 +17,14 @@ import (
 )
 
 func (c *MySQLMonitorComp) GenerateRuntimeConfig() (err error) {
-	for _, inst := range c.Params.InstancesInfo {
-		err = generateRuntimeConfigIns(c.Params, inst, &c.GeneralParam.RuntimeAccountParam)
+	for _, ele := range c.Params.PortBkInstanceList {
+		err = c.generateRuntimeConfigIns(ele.Port, ele.BkInstanceId)
 		if err != nil {
 			return err
 		}
 
 		if c.Params.MachineType == "backend" {
-			err = createUserListBackupTable(inst, &c.GeneralParam.RuntimeAccountParam)
+			err = c.createUserListBackupTable(ele.Port)
 			if err != nil {
 				return err
 			}
@@ -34,12 +33,12 @@ func (c *MySQLMonitorComp) GenerateRuntimeConfig() (err error) {
 	return nil
 }
 
-func createUserListBackupTable(instance *internal.InstanceInfo, rtap *components.RuntimeAccountParam) (err error) {
+func (c *MySQLMonitorComp) createUserListBackupTable(port int) (err error) {
 	db, err := sqlx.Connect(
 		"mysql",
 		fmt.Sprintf("%s:%s@tcp(%s:%d)/",
-			rtap.MonitorUser, rtap.MonitorPwd,
-			instance.Ip, instance.Port,
+			c.GeneralParam.RuntimeAccountParam.MonitorUser, c.GeneralParam.RuntimeAccountParam.MonitorPwd,
+			c.Params.IP, port,
 		))
 	if err != nil {
 		return err
@@ -67,35 +66,33 @@ func createUserListBackupTable(instance *internal.InstanceInfo, rtap *components
 	return nil
 }
 
-func generateRuntimeConfigIns(mmp *MySQLMonitorParam, instance *internal.InstanceInfo, rtap *components.RuntimeAccountParam) (err error) {
-	if instance.BkInstanceId <= 0 {
+func (c *MySQLMonitorComp) generateRuntimeConfigIns(port int, bkInstanceId int64) (err error) {
+	logDir := filepath.Join(cst.MySQLMonitorInstallPath, "logs")
+
+	ac, err := c.authByMachineType()
+	if err != nil {
+		return err
+	}
+
+	if bkInstanceId <= 0 {
 		err = errors.Errorf(
 			"%s:%d invalid bk_instance_id: %d",
-			instance.Ip,
-			instance.Port,
-			instance.BkInstanceId,
+			c.Params.IP, port, bkInstanceId,
 		)
 		logger.Error(err.Error())
 		return err
 	}
 
-	logDir := filepath.Join(cst.MySQLMonitorInstallPath, "logs")
-
-	ac, err := authByMachineType(mmp.MachineType, rtap)
-	if err != nil {
-		return err
-	}
-
 	cfg := config.Config{
-		BkBizId:      instance.BkBizId,
-		Ip:           instance.Ip,
-		Port:         instance.Port,
-		BkInstanceId: instance.BkInstanceId,
-		ImmuteDomain: instance.ImmuteDomain,
-		MachineType:  mmp.MachineType,
-		Role:         &instance.Role,
-		BkCloudID:    &mmp.BkCloudId,
-		DBModuleID:   &instance.DBModuleId,
+		BkBizId:      c.Params.BKBizId,
+		Ip:           c.Params.IP,
+		Port:         port,
+		BkInstanceId: bkInstanceId,
+		ImmuteDomain: c.Params.ImmuteDomain,
+		MachineType:  c.Params.MachineType,
+		Role:         &c.Params.Role,
+		BkCloudID:    &c.Params.BkCloudId,
+		DBModuleID:   &c.Params.DBModuleId,
 		Log: &config.LogConfig{
 			Console:    false,
 			LogFileDir: &logDir,
@@ -105,11 +102,11 @@ func generateRuntimeConfigIns(mmp *MySQLMonitorParam, instance *internal.Instanc
 		},
 		ItemsConfigFile: filepath.Join(
 			cst.MySQLMonitorInstallPath,
-			fmt.Sprintf("items-config_%d.yaml", instance.Port),
+			fmt.Sprintf("items-config_%d.yaml", port),
 		),
 		Auth:            *ac,
-		ApiUrl:          mmp.ApiUrl,
-		DBASysDbs:       mmp.SystemDbs,
+		ApiUrl:          c.Params.ApiUrl,
+		DBASysDbs:       c.Params.SystemDbs,
 		InteractTimeout: 5 * time.Second,
 		DefaultSchedule: "@every 1m",
 	}
@@ -122,34 +119,40 @@ func generateRuntimeConfigIns(mmp *MySQLMonitorParam, instance *internal.Instanc
 
 	cfgFilePath := filepath.Join(
 		filepath.Join(cst.MySQLMonitorInstallPath,
-			fmt.Sprintf("monitor-config_%d.yaml", instance.Port)),
+			fmt.Sprintf("monitor-config_%d.yaml", port)),
 	)
 
-	return internal.WriteConfig(cfgFilePath, b)
+	err = internal.WriteConfig(cfgFilePath, b)
+	if err != nil {
+		logger.Error(err.Error())
+		return err
+	}
+	//}
+	return nil
 }
 
-func authByMachineType(machineType string, rtap *components.RuntimeAccountParam) (ac *config.AuthCollect, err error) {
-	switch machineType {
+func (c *MySQLMonitorComp) authByMachineType() (ac *config.AuthCollect, err error) {
+	switch c.Params.MachineType {
 	case "proxy":
 		ac = &config.AuthCollect{
 			Proxy: &config.ConnectAuth{
-				User:     rtap.MonitorAccessAllUser,
-				Password: rtap.MonitorAccessAllPwd,
+				User:     c.GeneralParam.RuntimeAccountParam.MonitorAccessAllUser,
+				Password: c.GeneralParam.RuntimeAccountParam.MonitorAccessAllPwd,
 			},
 			ProxyAdmin: &config.ConnectAuth{
-				User:     rtap.ProxyAdminUser,
-				Password: rtap.ProxyAdminPwd,
+				User:     c.GeneralParam.RuntimeAccountParam.ProxyAdminUser,
+				Password: c.GeneralParam.RuntimeAccountParam.ProxyAdminUser,
 			},
 		}
 	case "backend", "single", "remote", "spider":
 		ac = &config.AuthCollect{
 			Mysql: &config.ConnectAuth{
-				User:     rtap.MonitorUser,
-				Password: rtap.MonitorPwd,
+				User:     c.GeneralParam.RuntimeAccountParam.MonitorUser,
+				Password: c.GeneralParam.RuntimeAccountParam.MonitorPwd,
 			},
 		}
 	default:
-		err = errors.Errorf("not support machine type: %s", machineType)
+		err = errors.Errorf("not support machine type: %s", c.Params.MachineType)
 		logger.Error(err.Error())
 		return nil, err
 	}
