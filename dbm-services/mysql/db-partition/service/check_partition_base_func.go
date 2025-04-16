@@ -554,7 +554,10 @@ func (m *ConfigDetail) GetAddPartitionSql(host Host) (string, error) {
 	// 表是分区表，但是已有的分区过旧，以至于不能包含今天或者未来的分区，添加能包含今天数据的分区
 	if len(output.CmdResults[0].TableData) == 0 {
 		begin = -1
-		vsql = fmt.Sprintf(`select %s %s from INFORMATION_SCHEMA.PARTITIONS limit 1;`, wantedDescIfOld, wantedNameIfOld)
+		// 这里原本的代码有点问题, 根本没必要查询 information schema, 甚至都不需要drs
+		// 就是个字符串生成, 不过考虑到时区敏感性, 还是保留 drs 调用
+		//vsql = fmt.Sprintf(`select %s %s from INFORMATION_SCHEMA.PARTITIONS limit 1;`, wantedDescIfOld, wantedNameIfOld)
+		vsql = fmt.Sprintf(`select %s %s;`, wantedDescIfOld, wantedNameIfOld)
 		queryRequest = QueryRequest{Addresses: []string{address}, Cmds: []string{vsql}, Force: true, QueryTimeout: 30,
 			BkCloudId: int(host.BkCloudId)}
 		output, err = OneAddressExecuteSql(queryRequest)
