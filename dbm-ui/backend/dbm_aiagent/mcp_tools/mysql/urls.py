@@ -8,10 +8,12 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 
-# common mcp tools
-urlpatterns = [
-    path("common/", include("backend.dbm_aiagent.mcp_tools.common.urls")),
-    path("mysql/", include("backend.dbm_aiagent.mcp_tools.mysql.urls"))
-]
+from backend.dbm_aiagent.mcp_tools.mysql.views.mysql_runtime_status import MySQLRuntimeStatusMcpToolsViewSet
+
+routers = DefaultRouter(trailing_slash=True)
+
+routers.register(r"", MySQLRuntimeStatusMcpToolsViewSet, basename="mcp-mysql-runtime-status")
+
+urlpatterns = routers.urls

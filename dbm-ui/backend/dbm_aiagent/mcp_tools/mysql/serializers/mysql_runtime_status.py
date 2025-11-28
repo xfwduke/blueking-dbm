@@ -8,10 +8,16 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-from django.urls import include, path
+from django.utils.translation import gettext as _
+from rest_framework import serializers
 
-# common mcp tools
-urlpatterns = [
-    path("common/", include("backend.dbm_aiagent.mcp_tools.common.urls")),
-    path("mysql/", include("backend.dbm_aiagent.mcp_tools.mysql.urls"))
-]
+
+class MySQLInstanceAddressesSerializer(serializers.Serializer):
+    addresses = serializers.ListField(child=serializers.CharField(help_text=_("MySQL 实例地址, 格式为 ip:port")),
+                                      help_text=_("MySQL 实例地址列表, 每个地址的格式为 ip:port"),
+                                      required=True)
+
+
+class ShowProcesslistResponseSerializer(serializers.Serializer):
+    address = serializers.CharField(help_text=_("MySQL 实例地址, 格式为 ip:port"))
+    current_time = serializers.TimeField(help_text=_("MySQL 实例当前时间"))

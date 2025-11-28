@@ -15,6 +15,7 @@ from blue_krill.data_types.enum import EnumField, StrStructuredEnum
 
 class DBMAMcpTools(StrStructuredEnum):
     DBM = EnumField("dbm-mcp", "DBM")
+    MYSQL = EnumField("dbm-mysql-mcp", "DBM-MYSQL-MCP")
 
 
 class DBMMCPTags(StrStructuredEnum):

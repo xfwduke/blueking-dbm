@@ -102,6 +102,56 @@ paths:
           appVerifiedRequired: true
           resourcePermissionRequired: true
         descriptionEn: 获取集群的业务和类型基础信息(无鉴权)
+  /apis/ai/mcp_tools/mysql/select_now/:
+    post:
+      operationId: mcp_mysql_views_select_now
+      description: 在 MySQL 实例上查询各自的当前时间
+      tags:
+      - read
+      - mcp-tools
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MySQLInstanceAddressesRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MySQLInstanceAddressesRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MySQLInstanceAddressesRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShowProcesslistResponse'
+          description: ''
+      x-bk-apigateway-resource:
+        isPublic: false
+        matchSubpath: false
+        backend:
+          name: default
+          method: post
+          path: /apis/ai/mcp_tools/mysql/select_now/
+          matchSubpath: false
+          timeout: 0
+        pluginConfigs:
+        - type: bk-header-rewrite
+          yaml: |
+            remove: []
+            set:
+            - key: X-Bkdbm-Mcp-Tag
+              value: read,mcp-tools
+        allowApplyPermission: false
+        authConfig:
+          userVerifiedRequired: true
+          appVerifiedRequired: true
+          resourcePermissionRequired: true
+        descriptionEn: 在 MySQL 实例上查询各自的当前时间
 components:
   schemas:
     ClusterEntry:
@@ -342,6 +392,31 @@ components:
       - cluster_domain
       - cluster_type
       - id
+    MySQLInstanceAddressesRequest:
+      type: object
+      properties:
+        addresses:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            description: MySQL 实例地址, 格式为 ip:port
+          description: MySQL 实例地址列表, 每个地址的格式为 ip:port
+      required:
+      - addresses
+    ShowProcesslistResponse:
+      type: object
+      properties:
+        address:
+          type: string
+          description: MySQL 实例地址, 格式为 ip:port
+        current_time:
+          type: string
+          format: time
+          description: MySQL 实例当前时间
+      required:
+      - address
+      - current_time
   securitySchemes:
     cookieAuth:
       type: apiKey
