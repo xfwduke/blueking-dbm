@@ -71,7 +71,7 @@ def repair_ro_slaves_replicate(cluster_ids: List[int], machine_type: MachineType
         for ele in infos:
             queue_to_create.append(
                 MySQLDBHAAutofixTicketStageQueue(
-                    priority=MySQLDBHAAutofixTicketPriority.P2.value,
+                    priority=MySQLDBHAAutofixTicketPriority.P0.value,
                     check_id=ele["check_id"],
                     cluster_id=ele["cluster_id"],
                     machine_type=machine_type.value,

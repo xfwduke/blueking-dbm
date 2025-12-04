@@ -26,10 +26,10 @@ from blue_krill.data_types.enum import EnumField, StructuredEnum
 class MySQLDBHAAutofixTicketPriority(int, StructuredEnum):
     """
     调度优先级
-    P1 最高
+    P0 最高
     同优先级的可以随意同时发起单据执行
     """
-
+    P0 = EnumField(0, _("优先级零"))
     P1 = EnumField(1, _("优先级一"))
     P2 = EnumField(2, _("优先级二"))
     P3 = EnumField(3, _("优先级三"))

@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"slices"
 	"time"
-
+	
 	"github.com/gofrs/flock"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
@@ -31,7 +31,7 @@ func (c *Checker) Run() (msg string, err error) {
 		slog.Error("check out of date", slog.String("err", err.Error()))
 		return "", err
 	}
-
+	
 	// 目前只更新 monitor config
 	// item config 还要等等
 	switch config.MonitorConfig.MachineType {
@@ -45,7 +45,7 @@ func (c *Checker) Run() (msg string, err error) {
 		if err != nil {
 			return "", err
 		}
-
+	
 	default:
 		// spider, proxy 暂时不自动更新
 		return "", nil
@@ -63,7 +63,7 @@ func checkOutOfDate() (err error) {
 		if e != nil {
 			errors.Join(err, e)
 		}
-
+		
 		mtime := st.ModTime()
 		if mtime.Before(time.Now().Add(-24 * time.Hour)) {
 			errors.Join(err, fmt.Errorf("%s is out of date", fn))
@@ -80,12 +80,12 @@ func (c *Checker) updateConfigFile(sii *mysql.StorageInstanceInfo) (err error) {
 			slog.Error(name, slog.String("err", err.Error()))
 			return err
 		}
-
+		
 		configFilePath = filepath.Join(cwd, configFilePath)
 	}
-
+	
 	lockFileName := fmt.Sprintf("%s.lock", filepath.Base(configFilePath))
-
+	
 	lockFileBasePath := filepath.Join(acst.MySQLMonitorInstallPath, "locks")
 	err = os.MkdirAll(lockFileBasePath, os.ModePerm)
 	if err != nil {
@@ -98,7 +98,7 @@ func (c *Checker) updateConfigFile(sii *mysql.StorageInstanceInfo) (err error) {
 	}
 	lockFilePath := filepath.Join(lockFileBasePath, lockFileName)
 	fl := flock.New(lockFilePath)
-
+	
 	// 排他锁
 	err = fl.Lock()
 	if err != nil {
@@ -116,11 +116,12 @@ func (c *Checker) updateConfigFile(sii *mysql.StorageInstanceInfo) (err error) {
 		name,
 		slog.String("lock", lockFilePath),
 	)
-
+	
 	slog.Info(name, slog.Any("monitor config before", config.MonitorConfig))
 	config.MonitorConfig.Role = &sii.InstanceInnerRole
+	config.MonitorConfig.BkInstanceId = &sii.BkInstanceId
 	slog.Info(name, slog.Any("monitor config after", config.MonitorConfig))
-
+	
 	b, err := yaml.Marshal(config.MonitorConfig)
 	if err != nil {
 		slog.Error(
@@ -130,13 +131,13 @@ func (c *Checker) updateConfigFile(sii *mysql.StorageInstanceInfo) (err error) {
 		)
 		return err
 	}
-
+	
 	cf, err := os.OpenFile(configFilePath, os.O_TRUNC|os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		slog.Error(name, slog.String("err", err.Error()))
 		return err
 	}
-
+	
 	_, err = cf.WriteString(string(b) + "\n")
 	if err != nil {
 		slog.Error(name, slog.String("err", err.Error()))
@@ -163,7 +164,7 @@ func (c *Checker) readInstanceInfoContent() (b []byte, err error) {
 	defer func() {
 		_ = f.Close()
 	}()
-
+	
 	b, err = io.ReadAll(f)
 	if err != nil {
 		slog.Error(
@@ -184,7 +185,7 @@ func (c *Checker) getSelfInfoProxy() (pii *mysql.ProxyInstanceInfo, err error) {
 		)
 		return nil, err
 	}
-
+	
 	var piis []mysql.ProxyInstanceInfo
 	err = json.Unmarshal(b, &piis)
 	if err != nil {
@@ -194,7 +195,7 @@ func (c *Checker) getSelfInfoProxy() (pii *mysql.ProxyInstanceInfo, err error) {
 		)
 		return nil, err
 	}
-
+	
 	idx := slices.IndexFunc(
 		piis, func(ele mysql.ProxyInstanceInfo) bool {
 			return ele.Ip == config.MonitorConfig.Ip && ele.Port == config.MonitorConfig.Port
@@ -208,7 +209,7 @@ func (c *Checker) getSelfInfoProxy() (pii *mysql.ProxyInstanceInfo, err error) {
 		)
 		return nil, err
 	}
-
+	
 	return &piis[idx], nil
 }
 
@@ -221,7 +222,7 @@ func (c *Checker) getSelfInfoStorage() (sii *mysql.StorageInstanceInfo, err erro
 		)
 		return nil, err
 	}
-
+	
 	var siis []mysql.StorageInstanceInfo
 	err = json.Unmarshal(b, &siis)
 	if err != nil {
@@ -231,7 +232,7 @@ func (c *Checker) getSelfInfoStorage() (sii *mysql.StorageInstanceInfo, err erro
 		)
 		return nil, err
 	}
-
+	
 	idx := slices.IndexFunc(
 		siis, func(ele mysql.StorageInstanceInfo) bool {
 			return ele.Ip == config.MonitorConfig.Ip && ele.Port == config.MonitorConfig.Port
@@ -245,7 +246,7 @@ func (c *Checker) getSelfInfoStorage() (sii *mysql.StorageInstanceInfo, err erro
 		)
 		return nil, err
 	}
-
+	
 	return &siis[idx], nil
 }
 

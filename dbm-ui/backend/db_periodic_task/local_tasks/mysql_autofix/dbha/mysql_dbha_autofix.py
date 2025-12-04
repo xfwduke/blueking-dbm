@@ -12,6 +12,7 @@ import json
 import logging
 import threading
 import uuid
+from collections import defaultdict
 from typing import List
 
 from celery.schedules import crontab
@@ -34,7 +35,7 @@ from backend.db_periodic_task.local_tasks.mysql_autofix.dbha.aggregate_events im
 from backend.db_periodic_task.local_tasks.mysql_autofix.dbha.commit_ticket import commit_ticket
 from backend.db_periodic_task.local_tasks.mysql_autofix.dbha.consts import AF_TICKET_RUNNING
 from backend.db_periodic_task.local_tasks.mysql_autofix.dbha.filter_ready_event import filter_ready_events
-from backend.ticket.constants import TicketStatus
+from backend.ticket.constants import TicketStatus, TicketType
 from backend.ticket.models import Ticket
 
 logger = logging.getLogger("celery")
@@ -107,22 +108,30 @@ def mysql_dbha_af_commiter():
     (A, (B), (C), D)
     这样奇葩的共享机器, 就有点不好搞怎么发起修复单据了
     """
+    # priorities = MySQLDBHAAutofixTicketPriority.get_values()
+    # priorities.sort()
+
     with transaction.atomic():
         uncommit_tickets = list(MySQLDBHAAutofixTicketStageQueue.objects.filter(status=TicketQueueUncommitStatus))
 
-        # 简单点, 先只考虑只有 p1, p2, p3 的情况
-        p1_uncommit_tickets: List[MySQLDBHAAutofixTicketStageQueue] = []
-        p2_uncommit_tickets: List[MySQLDBHAAutofixTicketStageQueue] = []
-        p3_uncommit_tickets: List[MySQLDBHAAutofixTicketStageQueue] = []
+        # 按优先级聚合未提交单据
+        p_uncommit_tickets = defaultdict(list)
         for ut in uncommit_tickets:
-            if ut.priority == MySQLDBHAAutofixTicketPriority.P1.value:
-                p1_uncommit_tickets.append(ut)
-            elif ut.priority == MySQLDBHAAutofixTicketPriority.P2.value:
-                p2_uncommit_tickets.append(ut)
-            elif ut.priority == MySQLDBHAAutofixTicketPriority.P3.value:
-                p3_uncommit_tickets.append(ut)
-            else:
-                raise Exception(ut.priority)
+            p_uncommit_tickets[ut.priority].append(ut)
+
+        # # 简单点, 先只考虑只有 p1, p2, p3 的情况
+        # p1_uncommit_tickets: List[MySQLDBHAAutofixTicketStageQueue] = []
+        # p2_uncommit_tickets: List[MySQLDBHAAutofixTicketStageQueue] = []
+        # p3_uncommit_tickets: List[MySQLDBHAAutofixTicketStageQueue] = []
+        # for ut in uncommit_tickets:
+        #     if ut.priority == MySQLDBHAAutofixTicketPriority.P1.value:
+        #         p1_uncommit_tickets.append(ut)
+        #     elif ut.priority == MySQLDBHAAutofixTicketPriority.P2.value:
+        #         p2_uncommit_tickets.append(ut)
+        #     elif ut.priority == MySQLDBHAAutofixTicketPriority.P3.value:
+        #         p3_uncommit_tickets.append(ut)
+        #     else:
+        #         raise Exception(ut.priority)
 
         # 找出还有未完成自愈的集群
         unfinish_cluster_ids = []
@@ -134,36 +143,57 @@ def mysql_dbha_af_commiter():
             if t.exists():
                 unfinish_cluster_ids.append(pt.cluster_id)
 
-    # 排除不能只按 cluster_id 排除
-    # 得按 queue_uuid 来
-    # 因为 queue_uuid 代表唯一的自愈单据
-    # 而一个 queue_uuid 可能对应多个集群
-    # 所以得用未完成的 cluster_id 反查到关联的待提交单据, 也就是 queue_uuid
-    relate_p1_queue_uuid = [ut.queue_uuid for ut in p1_uncommit_tickets if ut.cluster_id in unfinish_cluster_ids]
-    p1_uncommit_tickets = [ut for ut in p1_uncommit_tickets if ut.queue_uuid not in relate_p1_queue_uuid]
+    for p, uts in p_uncommit_tickets.items():
+        # 排除掉未完成的集群的关联单据
+        relate_queue_uuid = [ut.queue_uuid for ut in uts if ut.cluster_id in unfinish_cluster_ids]
+        p_uncommit_tickets[p] = [ut for ut in uts if ut.queue_uuid not in relate_queue_uuid]
 
-    relate_p2_queue_uuid = [ut.queue_uuid for ut in p2_uncommit_tickets if ut.cluster_id in unfinish_cluster_ids]
-    p2_uncommit_tickets = [ut for ut in p2_uncommit_tickets if ut.queue_uuid not in relate_p2_queue_uuid]
+    # 现在 p_uncommit_tickets 全是未提交的, 而且关联集群没有单据运行
+    for current_p, uts in p_uncommit_tickets.items():
+        current_uts = uts
+        # 排除掉更高优先级的关联
+        for higher_p in range(current_p):
+            higher_uts = p_uncommit_tickets[higher_p]
+            # 高优先级的关联集群
+            higher_relate_cluster_ids = [ut.cluster_id for ut in higher_uts]
+            # 在高优先级中存在的集群的对应 uuid
+            in_higher = [ut.queue_uuid for ut in current_uts if ut.cluster_id in higher_relate_cluster_ids]
+            # 排除掉这些 uuid
+            exclude_higher_tickets = [ut for ut in current_uts if ut.queue_uuid not in in_higher]
+            current_uts = exclude_higher_tickets
 
-    relate_p3_queue_uuid = [ut.queue_uuid for ut in p3_uncommit_tickets if ut.cluster_id in unfinish_cluster_ids]
-    p3_uncommit_tickets = [ut for ut in p3_uncommit_tickets if ut.queue_uuid not in relate_p3_queue_uuid]
+        commit_ticket(current_uts)
 
-    # 从 p2 里排除掉 p1 相关集群
-    p1_relate_cluster_ids = [ut.cluster_id for ut in p1_uncommit_tickets]
-    priority_exclude_uuid = [ut.queue_uuid for ut in p2_uncommit_tickets if ut.cluster_id in p1_relate_cluster_ids]
-    p2_uncommit_tickets = [ut for ut in p2_uncommit_tickets if ut.queue_uuid not in priority_exclude_uuid]
-    p2_relate_cluster_ids = [ut.cluster_id for ut in p2_uncommit_tickets]
-    # 从 p3 中排除 p1, p2 相关集群
-    priority_exclude_uuid = [
-        ut.queue_uuid for ut in p3_uncommit_tickets if ut.cluster_id in p1_relate_cluster_ids + p2_relate_cluster_ids
-    ]
-    p3_uncommit_tickets = [ut for ut in p3_uncommit_tickets if ut.queue_uuid not in priority_exclude_uuid]
-
-    # 到这里, p1, p2, p3 应该可以无脑发起单据了
-    # 不要放到事务里面去
-    commit_ticket(p1_uncommit_tickets)
-    commit_ticket(p2_uncommit_tickets)
-    commit_ticket(p3_uncommit_tickets)
+    # # 排除不能只按 cluster_id 排除
+    # # 得按 queue_uuid 来
+    # # 因为 queue_uuid 代表唯一的自愈单据
+    # # 而一个 queue_uuid 可能对应多个集群
+    # # 所以得用未完成的 cluster_id 反查到关联的待提交单据, 也就是 queue_uuid
+    # relate_p1_queue_uuid = [ut.queue_uuid for ut in p1_uncommit_tickets if ut.cluster_id in unfinish_cluster_ids]
+    # p1_uncommit_tickets = [ut for ut in p1_uncommit_tickets if ut.queue_uuid not in relate_p1_queue_uuid]
+    #
+    # relate_p2_queue_uuid = [ut.queue_uuid for ut in p2_uncommit_tickets if ut.cluster_id in unfinish_cluster_ids]
+    # p2_uncommit_tickets = [ut for ut in p2_uncommit_tickets if ut.queue_uuid not in relate_p2_queue_uuid]
+    #
+    # relate_p3_queue_uuid = [ut.queue_uuid for ut in p3_uncommit_tickets if ut.cluster_id in unfinish_cluster_ids]
+    # p3_uncommit_tickets = [ut for ut in p3_uncommit_tickets if ut.queue_uuid not in relate_p3_queue_uuid]
+    #
+    # # 从 p2 里排除掉 p1 相关集群
+    # p1_relate_cluster_ids = [ut.cluster_id for ut in p1_uncommit_tickets]
+    # priority_exclude_uuid = [ut.queue_uuid for ut in p2_uncommit_tickets if ut.cluster_id in p1_relate_cluster_ids]
+    # p2_uncommit_tickets = [ut for ut in p2_uncommit_tickets if ut.queue_uuid not in priority_exclude_uuid]
+    # p2_relate_cluster_ids = [ut.cluster_id for ut in p2_uncommit_tickets]
+    # # 从 p3 中排除 p1, p2 相关集群
+    # priority_exclude_uuid = [
+    #     ut.queue_uuid for ut in p3_uncommit_tickets if ut.cluster_id in p1_relate_cluster_ids + p2_relate_cluster_ids
+    # ]
+    # p3_uncommit_tickets = [ut for ut in p3_uncommit_tickets if ut.queue_uuid not in priority_exclude_uuid]
+    #
+    # # 到这里, p1, p2, p3 应该可以无脑发起单据了
+    # # 不要放到事务里面去
+    # commit_ticket(p1_uncommit_tickets)
+    # commit_ticket(p2_uncommit_tickets)
+    # commit_ticket(p3_uncommit_tickets)
 
 
 @register_periodic_task(run_every=crontab(minute="*"))
@@ -236,8 +266,43 @@ def mysql_dbha_af_schedule():
             # cluster_ids -> machine_type -> List[event] 字典
             agg_events = aggregate_events(candidate_events_list)
 
+            standardize_bills = []
             for k, v in agg_events.items():
                 cluster_ids = json.loads(k)
+
+                sample_ev = v[list(v)[0]][0]
+                dbas = sample_ev.dbas()
+                queue_uuid = uuid.uuid4().__str__()
+                ticket_param = {
+                    "ticket_type": TicketType.MYSQL_CLUSTER_STANDARDIZE,
+                    "creator": dbas[0],
+                    "helpers": dbas[1],
+                    "bk_biz_id": sample_ev.bk_biz_id,
+                    "remark": TicketType.MYSQL_CLUSTER_STANDARDIZE,
+                    "details": {
+                        "bk_biz_id": sample_ev.bk_biz_id,
+                        "cluster_ids": cluster_ids,
+                        "with_deploy_binary": False,
+                        "with_push_config": True,
+                        "with_cc_standardize": True,
+                        "with_instance_standardize": False
+                    }
+                }
+
+                for mt, events in v.items():
+                    for ev in events:
+                        standardize_bills.append(
+                            MySQLDBHAAutofixTicketStageQueue(
+                                priority=MySQLDBHAAutofixTicketPriority.P1,
+                                check_id=ev.check_id,
+                                cluster_id=ev.cluster_id,
+                                machine_type=ev.machine_type,
+                                ticket_param=ticket_param,
+                                af_uuid=ev.af_uuid,
+                                queue_uuid=queue_uuid,
+                            )
+                        )
+
                 cluster_type = Cluster.objects.filter(pk__in=cluster_ids).only("cluster_type").first().cluster_type
                 if cluster_type == ClusterType.TenDBSingle:
                     pass
@@ -247,6 +312,9 @@ def mysql_dbha_af_schedule():
                     tendbcluster.autofix(cluster_ids=cluster_ids, events_by_machine_type=v)
                 else:
                     pass  # 这里理论上是到达不了的
+
+            MySQLDBHAAutofixTicketStageQueue.objects.bulk_create(standardize_bills)
+
         finally:
             mysql_dbha_af_schedule_lock.release()
     else:
